@@ -37,7 +37,11 @@ export default function ProfileScreen() {
     setError(null);
     setLoading(true);
     try {
-      await setupProfile({ displayName: name.trim() });
+      const profilePictureUrl = getAvatarUrl(selectedAvatarSeed);
+      await setupProfile({ 
+        displayName: name.trim(),
+        profilePictureUrl,
+      });
       await completeProfileSetup();
       // Navigation is handled by AuthGuard after state update
     } catch (e) {

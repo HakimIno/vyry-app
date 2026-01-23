@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -16,12 +16,14 @@ interface NumericKeypadProps {
   onBackspacePress: () => void;
 }
 
+const DIGITS = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+] as const;
+
 export function NumericKeypad({ onDigitPress, onBackspacePress }: NumericKeypadProps) {
-  const digits = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-  ];
+  const digits = useMemo(() => DIGITS, []);
 
   return (
     <View style={styles.container}>
@@ -55,43 +57,44 @@ export function NumericKeypad({ onDigitPress, onBackspacePress }: NumericKeypadP
   );
 }
 
-function KeypadButton({
-  label,
-  onPress,
-  isBackspace = false,
-}: {
-  label: string;
-  onPress: () => void;
-  isBackspace?: boolean;
-}) {
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
+const KeypadButton = React.memo(
+  ({
+    label,
+    onPress,
+    isBackspace = false,
+  }: {
+    label: string;
+    onPress: () => void;
+    isBackspace?: boolean;
+  }) => {
+    const scale = useSharedValue(1);
+    const opacity = useSharedValue(1);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
+    const animatedStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: scale.value }],
+      opacity: opacity.value,
+    }));
 
-  const handlePressIn = () => {
-    scale.value = withTiming(0.92, {
-      duration: 100,
-    });
-    opacity.value = withTiming(0.6, {
-      duration: 100,
-    });
-    if (!isBackspace) {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
+    const handlePressIn = () => {
+      scale.value = withTiming(0.92, {
+        duration: 100,
+      });
+      opacity.value = withTiming(0.6, {
+        duration: 100,
+      });
+      if (!isBackspace) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    };
 
-  const handlePressOut = () => {
-    scale.value = withTiming(1, {
-      duration: 150,
-    });
-    opacity.value = withTiming(1, {
-      duration: 150,
-    });
-  };
+    const handlePressOut = () => {
+      scale.value = withTiming(1, {
+        duration: 150,
+      });
+      opacity.value = withTiming(1, {
+        duration: 150,
+      });
+    };
 
   return (
     <AnimatedPressable
@@ -113,7 +116,10 @@ function KeypadButton({
       )}
     </AnimatedPressable>
   );
-}
+  }
+);
+
+KeypadButton.displayName = 'KeypadButton';
 
 const styles = StyleSheet.create({
   container: {

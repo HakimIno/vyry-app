@@ -222,7 +222,7 @@ export async function setupPin(params: {
 }
 
 export async function verifyPin(pin: string) {
-  return await apiFetch<{ verified: boolean; attempts_remaining?: number | null }>('/api/v1/auth/verify-pin', {
+  return await apiFetch<{ verified: boolean; attempts_remaining?: number | null; lockout_remaining_seconds?: number | null }>('/api/v1/auth/verify-pin', {
     method: 'POST',
     auth: true,
     body: { pin },

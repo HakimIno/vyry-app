@@ -17,52 +17,55 @@ interface ConversationItemProps {
 }
 
 // Sub-component: Avatar with online status ring
-function AvatarWithStatus({
-  seed,
-  isOnline,
-  size = 56,
-}: {
-  seed: string;
-  isOnline?: boolean;
-  size?: number;
-}) {
-  const avatarUrl = getAvatarUrl(seed);
-  const ringSize = size + 6;
-  const statusDotSize = 14;
+const AvatarWithStatus = React.memo(
+  ({
+    seed,
+    isOnline,
+    size = 56,
+  }: {
+    seed: string;
+    isOnline?: boolean;
+    size?: number;
+  }) => {
+    const avatarUrl = getAvatarUrl(seed);
+    const ringSize = size + 6;
 
-  return (
-    <View style={[styles.avatarWrapper, { width: ringSize, height: ringSize }]}>
-      {isOnline && (
-        <View
+    return (
+      <View style={[styles.avatarWrapper, { width: ringSize, height: ringSize }]}>
+        {isOnline && (
+          <View
+            style={[
+              styles.onlineRing,
+              {
+                width: ringSize,
+                height: ringSize,
+                borderRadius: ringSize / 2,
+                borderColor: WHATSAPP_GREEN,
+              },
+            ]}
+          />
+        )}
+        <Image
+          source={{ uri: avatarUrl }}
           style={[
-            styles.onlineRing,
+            styles.avatar,
             {
-              width: ringSize,
-              height: ringSize,
-              borderRadius: ringSize / 2,
-              borderColor: WHATSAPP_GREEN,
+              width: size,
+              height: size,
+              borderRadius: size / 2,
             },
           ]}
+          contentFit="cover"
         />
-      )}
-      <Image
-        source={{ uri: avatarUrl }}
-        style={[
-          styles.avatar,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-          },
-        ]}
-        contentFit="cover"
-      />
-    </View>
-  );
-}
+      </View>
+    );
+  }
+);
+
+AvatarWithStatus.displayName = 'AvatarWithStatus';
 
 // Sub-component: Message status checkmarks
-function MessageStatusIcon({ status }: { status?: MessageStatus }) {
+const MessageStatusIcon = React.memo(({ status }: { status?: MessageStatus }) => {
   if (!status || status === 'sending') return null;
 
   const color = status === 'read' ? READ_CHECK_BLUE : '#8E8E93';
@@ -76,78 +79,85 @@ function MessageStatusIcon({ status }: { status?: MessageStatus }) {
       <Ionicons name="checkmark-done" size={16} color={color} />
     </View>
   );
-}
+});
+
+MessageStatusIcon.displayName = 'MessageStatusIcon';
 
 // Sub-component: Last message preview
-function MessagePreview({
-  conversation,
-  placeholderColor,
-}: {
-  conversation: Conversation;
-  placeholderColor: string;
-}) {
-  const { isTyping, isDeleted, messageStatus, lastMessage } = conversation;
+const MessagePreview = React.memo(
+  ({
+    conversation,
+    placeholderColor,
+  }: {
+    conversation: Conversation;
+    placeholderColor: string;
+  }) => {
+    const { isTyping, isDeleted, messageStatus, lastMessage } = conversation;
 
-  if (isTyping) {
-    return (
-      <ThemedText style={[styles.lastMessage, { color: WHATSAPP_GREEN }]}>
-        typing...
-      </ThemedText>
-    );
-  }
+    if (isTyping) {
+      return (
+        <ThemedText style={[styles.lastMessage, { color: WHATSAPP_GREEN }]}>
+          typing...
+        </ThemedText>
+      );
+    }
 
-  if (isDeleted) {
+    if (isDeleted) {
+      return (
+        <View style={styles.messageWithIcon}>
+          <Ionicons name="ban-outline" size={14} color={placeholderColor} />
+          <ThemedText style={[styles.lastMessage, styles.italicText, { color: placeholderColor }]}>
+            You deleted this message.
+          </ThemedText>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.messageWithIcon}>
-        <Ionicons name="ban-outline" size={14} color={placeholderColor} />
-        <ThemedText style={[styles.lastMessage, styles.italicText, { color: placeholderColor }]}>
-          You deleted this message.
+        <MessageStatusIcon status={messageStatus} />
+        <ThemedText
+          style={[styles.lastMessage, { color: placeholderColor }]}
+          numberOfLines={1}
+        >
+          {lastMessage}
         </ThemedText>
       </View>
     );
   }
+);
 
-  return (
-    <View style={styles.messageWithIcon}>
-      <MessageStatusIcon status={messageStatus} />
-      <ThemedText
-        style={[styles.lastMessage, { color: placeholderColor }]}
-        numberOfLines={1}
-      >
-        {lastMessage}
-      </ThemedText>
-    </View>
-  );
-}
+MessagePreview.displayName = 'MessagePreview';
 
 // Main component
-export function ConversationItem({
-  conversation,
-  onPress,
-  onLongPress,
-}: ConversationItemProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const bgColor = isDark ? '#000000' : '#FFFFFF';
-  const borderColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
-  const placeholderColor = isDark ? '#8E8E93' : '#8E8E93';
+export const ConversationItem = React.memo(
+  ({
+    conversation,
+    onPress,
+    onLongPress,
+  }: ConversationItemProps) => {
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+    const bgColor = isDark ? '#000000' : '#FFFFFF';
+    const borderColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+    const placeholderColor = isDark ? '#8E8E93' : '#8E8E93';
 
-  const handlePress = () => {
-    if (Platform.OS !== 'web') {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    onPress(conversation.id);
-  };
+    const handlePress = React.useCallback(() => {
+      if (Platform.OS !== 'web') {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      onPress(conversation.id);
+    }, [onPress, conversation.id]);
 
-  const handleLongPress = () => {
-    if (Platform.OS !== 'web') {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    onLongPress?.(conversation.id);
-  };
+    const handleLongPress = React.useCallback(() => {
+      if (Platform.OS !== 'web') {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+      onLongPress?.(conversation.id);
+    }, [onLongPress, conversation.id]);
 
-  const hasUnread = conversation.unreadCount > 0;
-  const timestampColor = hasUnread ? WHATSAPP_GREEN : placeholderColor;
+    const hasUnread = conversation.unreadCount > 0;
+    const timestampColor = hasUnread ? WHATSAPP_GREEN : placeholderColor;
 
   return (
     <Pressable
@@ -208,7 +218,10 @@ export function ConversationItem({
       </View>
     </Pressable>
   );
-}
+  }
+);
+
+ConversationItem.displayName = 'ConversationItem';
 
 // Re-export Conversation type for backward compatibility
 export type { Conversation } from '@/types/chat';

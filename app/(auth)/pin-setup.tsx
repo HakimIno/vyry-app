@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageBackground, KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -46,7 +46,10 @@ export default function PinSetupScreen() {
     }
   }, [confirmPin, step, setupPinMutation.isPending]);
 
-  const onSubmit = async () => {
+  const completePinSetupRef = useRef(completePinSetup);
+  completePinSetupRef.current = completePinSetup;
+
+  const onSubmit = useCallback(async () => {
     if (pin !== confirmPin) {
       setError('รหัส PIN ไม่ตรงกัน');
       setConfirmPin('');
@@ -60,7 +63,7 @@ export default function PinSetupScreen() {
         confirmPin,
         enableRegistrationLock: true,
       });
-      await completePinSetup();
+      await completePinSetupRef.current();
       // Navigation is handled by AuthGuard after state update
     } catch (e) {
       setConfirmPin('');
@@ -71,37 +74,39 @@ export default function PinSetupScreen() {
         setError('ตั้ง PIN ไม่สำเร็จ');
       }
     }
-  };
+  }, [pin, confirmPin, setupPinMutation]);
 
-  const handleDigitPress = (digit: string) => {
+  const handleDigitPress = useCallback((digit: string) => {
     if (step === 'create') {
       if (pin.length < PIN_LENGTH) {
-        setPin(pin + digit);
+        setPin((prev) => prev + digit);
       }
     } else {
       if (confirmPin.length < PIN_LENGTH) {
-        setConfirmPin(confirmPin + digit);
+        setConfirmPin((prev) => prev + digit);
       }
     }
-  };
+  }, [step, pin.length, confirmPin.length]);
 
-  const handleBackspace = () => {
+  const handleBackspace = useCallback(() => {
     if (step === 'create') {
-      setPin(pin.slice(0, -1));
+      setPin((prev) => prev.slice(0, -1));
     } else {
-      setConfirmPin(confirmPin.slice(0, -1));
+      setConfirmPin((prev) => prev.slice(0, -1));
     }
-  };
+  }, [step]);
 
-  const getTitle = () => {
-    return step === 'create' ? 'สร้างรหัส PIN' : 'ยืนยันรหัส PIN';
-  };
+  const title = useMemo(
+    () => step === 'create' ? 'สร้างรหัส PIN' : 'ยืนยันรหัส PIN',
+    [step]
+  );
 
-  const getSubtitle = () => {
-    return step === 'create'
+  const subtitle = useMemo(
+    () => step === 'create'
       ? 'ตั้งรหัส PIN 6 หลักเพื่อความปลอดภัย'
-      : 'กรอกรหัส PIN อีกครั้งเพื่อยืนยัน';
-  };
+      : 'กรอกรหัส PIN อีกครั้งเพื่อยืนยัน',
+    [step]
+  );
 
   return (
     <ImageBackground
@@ -120,7 +125,7 @@ export default function PinSetupScreen() {
               <MaterialIcons name="lock" size={48} color="#FFFFFF" />
             </View>
             <ThemedText style={[styles.title, { color: '#FFFFFF' }]}>
-              {getTitle()}
+              {title}
             </ThemedText>
           </View>
 
@@ -163,9 +168,7 @@ export default function PinSetupScreen() {
             {/* Footer text */}
             <View style={styles.footer}>
               <ThemedText style={[styles.footerText, { color: '#FFFFFF' }]}>
-                {step === 'create'
-                  ? 'นี่จะช่วยให้บัญชีของคุณปลอดภัย'
-                  : 'กรอกรหัส PIN อีกครั้งเพื่อยืนยัน'}
+                {subtitle}
               </ThemedText>
             </View>
           </View>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -48,45 +48,62 @@ export function PinInput({
         withTiming(0, { duration: 50 })
       );
     }
-  }, [error]);
+  }, [error, shakeAnim]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shakeAnim.value }],
   }));
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     inputRef.current?.focus();
-  };
+  }, []);
 
-  const handleChange = (text: string) => {
-    const cleanText = text.replace(/\D/g, '').slice(0, length);
-    if (cleanText.length > value.length && Platform.OS !== 'web') {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    onChange(cleanText);
-  };
+  const handleChange = useCallback(
+    (text: string) => {
+      const cleanText = text.replace(/\D/g, '').slice(0, length);
+      if (cleanText.length > value.length && Platform.OS !== 'web') {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+      onChange(cleanText);
+    },
+    [length, value.length, onChange]
+  );
+
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+  }, []);
+
+  const dots = useMemo(
+    () =>
+      Array.from({ length }, (_, i) => {
+        const isFilled = value.length > i;
+        const isActive = i === value.length && isFocused;
+
+        return (
+          <PinDot
+            key={i}
+            isFilled={isFilled}
+            isActive={isActive}
+            error={error}
+            isDark={isDark}
+            secure={secure}
+            digit={secure ? undefined : value[i]}
+            large={large}
+          />
+        );
+      }),
+    [length, value, isFocused, error, isDark, secure, large]
+  );
 
   return (
     <View style={styles.container}>
       <Pressable onPress={handlePress}>
         <Animated.View style={[styles.dotsContainer, animatedStyle]}>
-          {Array.from({ length }, (_, i) => {
-            const isFilled = value.length > i;
-            const isActive = i === value.length && isFocused;
-
-            return (
-              <PinDot
-                key={i}
-                isFilled={isFilled}
-                isActive={isActive}
-                error={error}
-                isDark={isDark}
-                secure={secure}
-                digit={secure ? undefined : value[i]}
-                large={large}
-              />
-            );
-          })}
+          {dots}
         </Animated.View>
       </Pressable>
 
@@ -98,8 +115,8 @@ export function PinInput({
         keyboardType="number-pad"
         maxLength={length}
         autoFocus={autoFocus}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         caretHidden
         secureTextEntry
       />
@@ -107,65 +124,60 @@ export function PinInput({
   );
 }
 
-function PinDot({
-  isFilled,
-  isActive,
-  error,
-  isDark,
-  secure,
-  digit,
-  large = false,
-}: {
-  isFilled: boolean;
-  isActive: boolean;
-  error: boolean;
-  isDark: boolean;
-  secure: boolean;
-  digit?: string;
-  large?: boolean;
-}) {
-  const opacity = useSharedValue(isFilled ? 1 : 0);
+const PinDot = React.memo(
+  ({
+    isFilled,
+    isActive,
+    error,
+    isDark,
+    secure,
+    digit,
+    large = false,
+  }: {
+    isFilled: boolean;
+    isActive: boolean;
+    error: boolean;
+    isDark: boolean;
+    secure: boolean;
+    digit?: string;
+    large?: boolean;
+  }) => {
+    const opacity = useSharedValue(isFilled ? 1 : 0);
 
-  useEffect(() => {
-    if (isFilled) {
-      opacity.value = withTiming(1, {
-        duration: 200,
+    useEffect(() => {
+      opacity.value = withTiming(isFilled ? 1 : 0, {
+        duration: isFilled ? 200 : 150,
       });
-    } else {
-      opacity.value = withTiming(0, {
-        duration: 150,
-      });
-    }
-  }, [isFilled]);
+    }, [isFilled, opacity]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
+    const animatedStyle = useAnimatedStyle(() => ({
+      opacity: opacity.value,
+    }));
 
-  const getBorderColor = () => {
-    if (error) return 'rgba(255, 59, 48, 0.5)';
-    if (isActive) return 'rgba(255, 255, 255, 0.4)';
-    return 'rgba(255, 255, 255, 0.2)';
-  };
+    const borderColor = useMemo(() => {
+      if (error) return 'rgba(255, 59, 48, 0.5)';
+      if (isActive) return 'rgba(255, 255, 255, 0.4)';
+      return 'rgba(255, 255, 255, 0.2)';
+    }, [error, isActive]);
 
-  return (
-    <View
-      style={[
-        large ? styles.dotLarge : styles.dot,
-        {
-          borderColor: getBorderColor(),
-        },
-      ]}
-    >
-      <Animated.View
+    return (
+      <View
         style={[
-          large ? styles.dotFillLarge : styles.dotFill,
-          animatedStyle,
+          large ? styles.dotLarge : styles.dot,
+          {
+            borderColor,
+          },
         ]}
-      />
-    </View>
-  );
-}
+      >
+        <Animated.View
+          style={[large ? styles.dotFillLarge : styles.dotFill, animatedStyle]}
+        />
+      </View>
+    );
+  }
+);
+
+PinDot.displayName = 'PinDot';
 
 const styles = StyleSheet.create({
   container: {
