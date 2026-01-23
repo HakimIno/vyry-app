@@ -1,18 +1,17 @@
-import { Stack } from 'expo-router';
-import React from 'react';
+import { Stack } from "expo-router";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export default function TabsLayout() {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
 
   return (
     <Stack
       screenOptions={{
         headerShown: false,
         contentStyle: {
-          backgroundColor: isDark ? '#000000' : '#FAFBFC',
+          backgroundColor: isDark ? "#000000" : "#FAFBFC",
         },
       }}
     >
@@ -21,4 +20,3 @@ export default function TabsLayout() {
     </Stack>
   );
 }
-

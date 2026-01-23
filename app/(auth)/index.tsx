@@ -1,30 +1,27 @@
-import { useMemo } from 'react';
-import { Dimensions, ImageBackground, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Canvas, Path, Skia } from '@shopify/react-native-skia';
-import { Image } from 'expo-image';
+import { Canvas, Path, Skia } from "@shopify/react-native-skia";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import { useMemo } from "react";
+import { Dimensions, ImageBackground, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ThemedText } from '@/components/themed-text';
-import { IosButton } from '@/components/ui/ios-button';
+import { ThemedText } from "@/components/themed-text";
+import { IosButton } from "@/components/ui/ios-button";
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { width } = Dimensions.get('window');
+  const { width } = Dimensions.get("window");
 
-  const centerSeed = 'center-main-mm';
-  const innerSeeds = useMemo(
-    () => ['inner-1', 'inner-2'],
-    [],
-  );
+  const centerSeed = "center-main-mm";
+  const innerSeeds = useMemo(() => ["inner-1", "inner-2"], []);
   const outerSeeds = useMemo(
-    () => ['outer-1', 'outer-2', 'outer-3', 'outer-4' , 'outer-5', 'outer-6'],
-    [],
+    () => ["outer-1", "outer-2", "outer-3", "outer-4", "outer-5", "outer-6"],
+    []
   );
 
   const ringSize = width * 0.78;
-  const innerRadius = ringSize * 0.30;
+  const innerRadius = ringSize * 0.3;
   const outerRadius = ringSize * 0.48;
   const arcYOffset = width * 0.06; // push the drawn rings slightly downward
 
@@ -39,7 +36,7 @@ export default function WelcomeScreen() {
           y: Math.sin(angle) * innerRadius,
         };
       }),
-    [innerRadius, innerSeeds],
+    [innerRadius, innerSeeds]
   );
 
   const outerAvatars = useMemo(
@@ -53,7 +50,7 @@ export default function WelcomeScreen() {
           y: Math.sin(angle) * outerRadius,
         };
       }),
-    [outerRadius, outerSeeds],
+    [outerRadius, outerSeeds]
   );
 
   const buildArc = (radius: number, startDeg: number, endDeg: number) => {
@@ -62,18 +59,20 @@ export default function WelcomeScreen() {
     path.addArc(
       { x: width / 2 - radius, y: width * 0.26 + arcYOffset, width: size, height: size },
       startDeg,
-      endDeg,
+      endDeg
     );
     return path;
   };
 
   return (
     <ImageBackground
-      source={require('@/assets/bg.png')}
+      source={require("@/assets/bg.png")}
       resizeMode="cover"
       style={styles.container}
     >
-      <View style={[styles.body, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 10 }]}>
+      <View
+        style={[styles.body, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 10 }]}
+      >
         <View style={styles.orbitWrapper}>
           <Canvas style={styles.canvas}>
             <Path
@@ -81,14 +80,12 @@ export default function WelcomeScreen() {
               color="rgba(255, 138, 138, 0.45)"
               strokeWidth={1}
               style="stroke"
-              
             />
             <Path
               path={buildArc(outerRadius * 1.5, 0, 360)}
               color="rgba(120, 214, 143, 0.35)"
               strokeWidth={1}
               style="stroke"
-              
             />
           </Canvas>
 
@@ -107,10 +104,7 @@ export default function WelcomeScreen() {
                 styles.avatar,
                 styles.innerAvatar,
                 {
-                  transform: [
-                    { translateX: item.x },
-                    { translateY: item.y },
-                  ],
+                  transform: [{ translateX: item.x }, { translateY: item.y }],
                 },
               ]}
             >
@@ -129,10 +123,7 @@ export default function WelcomeScreen() {
                 styles.avatar,
                 styles.outerAvatar,
                 {
-                  transform: [
-                    { translateX: item.x },
-                    { translateY: item.y },
-                  ],
+                  transform: [{ translateX: item.x }, { translateY: item.y }],
                 },
               ]}
             >
@@ -148,16 +139,13 @@ export default function WelcomeScreen() {
         <View style={styles.copy}>
           <ThemedText style={styles.title}>Welcome!</ThemedText>
           <ThemedText style={styles.subtitle}>
-            Connect with new friends, chat all day, share photos and videos, and keep every important moment together in one place.
+            Connect with new friends, chat all day, share photos and videos, and keep every
+            important moment together in one place.
           </ThemedText>
         </View>
 
         <View style={styles.buttonContainer}>
-          <IosButton
-            title="Get Started"
-            fullWidth
-            onPress={() => router.push('/(auth)/phone')}
-          />
+          <IosButton title="Get Started" fullWidth onPress={() => router.push("/(auth)/phone")} />
         </View>
       </View>
     </ImageBackground>
@@ -167,18 +155,18 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   body: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     marginHorizontal: 12,
   },
   orbitWrapper: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   canvas: {
     ...StyleSheet.absoluteFillObject,
@@ -187,22 +175,22 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 60,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
   },
   centerImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   avatar: {
-    position: 'absolute',
+    position: "absolute",
     width: 44,
     height: 44,
     borderRadius: 32,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.16)",
   },
   innerAvatar: {
     width: 46,
@@ -215,21 +203,21 @@ const styles = StyleSheet.create({
     borderRadius: 34,
   },
   avatarImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   title: {
     fontSize: 13,
-    fontFamily: 'Roboto_400Regular',
-    color: 'white',
-    textAlign: 'center',
+    fontFamily: "LINESeedSansTH_Rg",
+    color: "white",
+    textAlign: "center",
     lineHeight: 14 * 1.3,
   },
   subtitle: {
     fontSize: 11,
-    fontFamily: 'Roboto_400Regular',
-    color: 'white',
-    textAlign: 'center',
+    fontFamily: "LINESeedSansTH_Rg",
+    color: "white",
+    textAlign: "center",
     lineHeight: 12 * 1.3,
   },
   copy: {
@@ -241,4 +229,3 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
 });
-

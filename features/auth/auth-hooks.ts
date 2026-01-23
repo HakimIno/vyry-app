@@ -1,6 +1,5 @@
-import { useMutation } from '@tanstack/react-query';
-import { setupPin, verifyPin } from './auth-api';
-import type { HttpError } from '@/lib/http';
+import { useMutation } from "@tanstack/react-query";
+import { setupPin, verifyPin } from "./auth-api";
 
 export function useSetupPin() {
   return useMutation({

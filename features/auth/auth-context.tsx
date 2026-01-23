@@ -1,25 +1,32 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { AppState, type AppStateStatus } from "react-native";
+import { queryClient } from "@/app/_layout";
+import { clearAuthenticationFailureHandler, setAuthenticationFailureHandler } from "@/lib/http";
+import { SecureKV } from "@/lib/secure-store";
+import { uuidv4 } from "@/lib/uuid";
+import { useProfileStore } from "@/stores/profile-store";
 
-import { SecureKV } from '@/lib/secure-store';
-import { uuidv4 } from '@/lib/uuid';
-import { queryClient } from '@/app/_layout';
-import { useProfileStore } from '@/stores/profile-store';
-import { setAuthenticationFailureHandler, clearAuthenticationFailureHandler } from '@/lib/http';
-
-import type { VerifyOtpResponse } from './auth-types';
+import type { VerifyOtpResponse } from "./auth-types";
 
 type AuthState =
-  | { status: 'loading' }
-  | { status: 'signedOut' }
+  | { status: "loading" }
+  | { status: "signedOut" }
   | {
-    status: 'signedIn';
-    accessToken: string;
-    refreshToken: string;
-    requiresProfileSetup: boolean;
-    requiresPinSetup: boolean;
-    requiresPinVerify: boolean;
-  };
+      status: "signedIn";
+      accessToken: string;
+      refreshToken: string;
+      requiresProfileSetup: boolean;
+      requiresPinSetup: boolean;
+      requiresPinVerify: boolean;
+    };
 
 type AuthContextValue = {
   state: AuthState;
@@ -36,23 +43,23 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // Constants
 const AUTH_KEYS = {
-  ACCESS_TOKEN: 'auth.accessToken',
-  REFRESH_TOKEN: 'auth.refreshToken',
-  REQUIRES_PROFILE_SETUP: 'auth.requiresProfileSetup',
-  REQUIRES_PIN_SETUP: 'auth.requiresPinSetup',
-  REQUIRES_PIN_VERIFY: 'auth.requiresPinVerify',
-  DEVICE_UUID: 'device.uuid',
+  ACCESS_TOKEN: "auth.accessToken",
+  REFRESH_TOKEN: "auth.refreshToken",
+  REQUIRES_PROFILE_SETUP: "auth.requiresProfileSetup",
+  REQUIRES_PIN_SETUP: "auth.requiresPinSetup",
+  REQUIRES_PIN_VERIFY: "auth.requiresPinVerify",
+  DEVICE_UUID: "device.uuid",
 } as const;
 
 // Helper functions
-const parseBool = (val: string | null): boolean => val === 'true';
+const parseBool = (val: string | null): boolean => val === "true";
 
 const shouldPreserveState = (state: AuthState): boolean => {
-  return state.status === 'signedIn' && !state.requiresPinVerify;
+  return state.status === "signedIn" && !state.requiresPinVerify;
 };
 
-const isSignedIn = (state: AuthState): state is Extract<AuthState, { status: 'signedIn' }> => {
-  return state.status === 'signedIn';
+const isSignedIn = (state: AuthState): state is Extract<AuthState, { status: "signedIn" }> => {
+  return state.status === "signedIn";
 };
 
 // Auth data management
@@ -100,15 +107,19 @@ class AuthStorage {
     ]);
   }
 
-  static async updateFlags(updates: Partial<{
-    requiresProfileSetup: boolean;
-    requiresPinSetup: boolean;
-    requiresPinVerify: boolean;
-  }>) {
+  static async updateFlags(
+    updates: Partial<{
+      requiresProfileSetup: boolean;
+      requiresPinSetup: boolean;
+      requiresPinVerify: boolean;
+    }>
+  ) {
     const promises: Promise<void>[] = [];
 
     if (updates.requiresProfileSetup !== undefined) {
-      promises.push(SecureKV.set(AUTH_KEYS.REQUIRES_PROFILE_SETUP, String(updates.requiresProfileSetup)));
+      promises.push(
+        SecureKV.set(AUTH_KEYS.REQUIRES_PROFILE_SETUP, String(updates.requiresProfileSetup))
+      );
     }
     if (updates.requiresPinSetup !== undefined) {
       promises.push(SecureKV.set(AUTH_KEYS.REQUIRES_PIN_SETUP, String(updates.requiresPinSetup)));
@@ -141,10 +152,10 @@ class AuthStorage {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({ status: 'loading' });
+  const [state, setState] = useState<AuthState>({ status: "loading" });
   const [deviceUuid, setDeviceUuid] = useState<string | null>(null);
   const bootstrapRunRef = useRef(false);
-  const stateSnapshotRef = useRef<AuthState>({ status: 'loading' });
+  const stateSnapshotRef = useRef<AuthState>({ status: "loading" });
 
   // Update snapshot whenever state changes
   useEffect(() => {
@@ -155,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Prevent bootstrap from resetting verified state
     if (shouldPreserveState(stateSnapshotRef.current)) {
       if (__DEV__) {
-        console.log('[Auth] Bootstrap blocked: PIN already verified');
+        console.log("[Auth] Bootstrap blocked: PIN already verified");
       }
       bootstrapRunRef.current = true;
       return;
@@ -164,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Only run once
     if (bootstrapRunRef.current) {
       if (__DEV__) {
-        console.log('[Auth] Bootstrap already run, skipping');
+        console.log("[Auth] Bootstrap already run, skipping");
       }
       return;
     }
@@ -183,15 +194,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Never override verified state
           if (shouldPreserveState(current)) {
             if (__DEV__) {
-              console.log('[Auth] Bootstrap: Preserving verified state');
+              console.log("[Auth] Bootstrap: Preserving verified state");
             }
             return current;
           }
 
           // Initial bootstrap or signed out
-          if (current.status === 'loading' || current.status === 'signedOut') {
+          if (current.status === "loading" || current.status === "signedOut") {
             return {
-              status: 'signedIn',
+              status: "signedIn",
               accessToken: stored.accessToken!,
               refreshToken: stored.refreshToken!,
               requiresProfileSetup: stored.requiresProfileSetup,
@@ -215,15 +226,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return current;
         });
       } else {
-        setState((current) =>
-          current.status === 'signedOut' ? current : { status: 'signedOut' }
-        );
+        setState((current) => (current.status === "signedOut" ? current : { status: "signedOut" }));
       }
     } catch (error) {
       if (__DEV__) {
-        console.error('[Auth] Bootstrap error:', error);
+        console.error("[Auth] Bootstrap error:", error);
       }
-      setState({ status: 'signedOut' });
+      setState({ status: "signedOut" });
     }
   }, []);
 
@@ -244,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AuthStorage.setSession(sessionData);
 
     setState({
-      status: 'signedIn',
+      status: "signedIn",
       ...sessionData,
     });
   }, []);
@@ -256,9 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     setState((s) =>
-      isSignedIn(s)
-        ? { ...s, requiresProfileSetup: false, requiresPinSetup: true }
-        : s
+      isSignedIn(s) ? { ...s, requiresProfileSetup: false, requiresPinSetup: true } : s
     );
   }, []);
 
@@ -269,9 +276,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     setState((s) =>
-      isSignedIn(s)
-        ? { ...s, requiresPinSetup: false, requiresPinVerify: false }
-        : s
+      isSignedIn(s) ? { ...s, requiresPinSetup: false, requiresPinVerify: false } : s
     );
   }, []);
 
@@ -282,11 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       requiresPinVerify: false,
     });
 
-    setState((s) =>
-      isSignedIn(s)
-        ? { ...s, requiresPinVerify: false }
-        : s
-    );
+    setState((s) => (isSignedIn(s) ? { ...s, requiresPinVerify: false } : s));
   }, []);
 
   const signOut = useCallback(async () => {
@@ -299,7 +300,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await useProfileStore.getState().reset();
     queryClient.clear();
 
-    setState({ status: 'signedOut' });
+    setState({ status: "signedOut" });
   }, []);
 
   // Handle app state changes
@@ -307,15 +308,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let appState = AppState.currentState;
 
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      const isBackgrounding = appState === 'active' &&
-        (nextAppState === 'background' || nextAppState === 'inactive');
-      const isForegrounding = appState === 'background' && nextAppState === 'active';
+      const isBackgrounding =
+        appState === "active" && (nextAppState === "background" || nextAppState === "inactive");
+      const isForegrounding = appState === "background" && nextAppState === "active";
 
       if (__DEV__) {
         if (isBackgrounding) {
-          console.log('[Auth] App backgrounding');
+          console.log("[Auth] App backgrounding");
         } else if (isForegrounding) {
-          console.log('[Auth] App foregrounding');
+          console.log("[Auth] App foregrounding");
         }
       }
 
@@ -326,18 +327,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await AuthStorage.updateFlags({
             requiresPinVerify: true,
           });
-          setState((s) =>
-            isSignedIn(s)
-              ? { ...s, requiresPinVerify: true }
-              : s
-          );
+          setState((s) => (isSignedIn(s) ? { ...s, requiresPinVerify: true } : s));
         }
       }
 
       appState = nextAppState;
     };
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => subscription.remove();
   }, []);
 
@@ -345,7 +342,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleAuthFailure = async () => {
       if (__DEV__) {
-        console.log('[Auth] Authentication failed, signing out');
+        console.log("[Auth] Authentication failed, signing out");
       }
       await signOut();
     };
@@ -382,6 +379,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within <AuthProvider />');
+  if (!ctx) throw new Error("useAuth must be used within <AuthProvider />");
   return ctx;
 }

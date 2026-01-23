@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ThemedText } from '@/components/themed-text';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Fonts } from '@/constants/theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -39,10 +40,10 @@ export function NumericKeypad({ onDigitPress, onBackspacePress }: NumericKeypadP
           ))}
         </View>
       ))}
-      
+
       {/* Bottom row: 0 and backspace */}
       <View style={styles.row}>
-        <View style={[styles.button, { backgroundColor: 'transparent'}]}></View>
+        <View style={[styles.button, { backgroundColor: 'transparent' }]}></View>
         <KeypadButton
           label="0"
           onPress={() => onDigitPress('0')}
@@ -96,26 +97,28 @@ const KeypadButton = React.memo(
       });
     };
 
-  return (
-    <AnimatedPressable
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      onPress={onPress}
-      style={[styles.button, animatedStyle]}
-    >
-      {isBackspace ? (
-        <MaterialIcons
-          name="backspace"
-          size={24}
-          color="#FFFFFF"
-        />
-      ) : (
-        <ThemedText style={styles.buttonText}>
-          {label}
-        </ThemedText>
-      )}
-    </AnimatedPressable>
-  );
+    return (
+      <AnimatedPressable
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={onPress}
+        style={[styles.button, animatedStyle]}
+      >
+        {isBackspace ? (
+          <MaterialIcons
+            name="backspace"
+            size={24}
+            color="#FFFFFF"
+          />
+        ) : (
+          <View style={styles.buttonTextContainer}>
+            <ThemedText style={styles.buttonText}>
+              {label}
+            </ThemedText>
+          </View>
+        )}
+      </AnimatedPressable>
+    );
   }
 );
 
@@ -140,7 +143,15 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 32,
-    fontFamily: 'Roboto_500Medium',
+    fontFamily: Fonts.bold,
     color: '#FFFFFF',
+  },
+  buttonTextContainer: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 100
   },
 });

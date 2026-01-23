@@ -1,17 +1,14 @@
-import React from 'react';
-import { StyleSheet, View, Pressable, Platform, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-
-import { ThemedText } from '@/components/themed-text';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { SearchBar } from './search-bar';
-import { WHATSAPP_GREEN } from '@/constants/chat';
-import { router } from 'expo-router';
-import { Image } from 'expo-image';
-import { getAvatarUrl, AVATAR_SEEDS } from '../ui/avatar-picker-sheet';
-import { useProfile } from '@/stores/profile-store';
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
+import { router } from "expo-router";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ThemedText } from "@/components/themed-text";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useProfile } from "@/stores/profile-store";
+import { AVATAR_SEEDS, getAvatarUrl } from "../ui/avatar-picker-sheet";
+import { SearchBar } from "./search-bar";
 
 interface ChatHeaderProps {
   searchQuery: string;
@@ -22,7 +19,7 @@ interface ChatHeaderProps {
 }
 
 // Sub-component: Header action button
-function HeaderButton({
+function _HeaderButton({
   icon,
   onPress,
   color,
@@ -34,7 +31,7 @@ function HeaderButton({
   backgroundColor?: string;
 }) {
   const handlePress = () => {
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== "web") {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     onPress?.();
@@ -42,10 +39,7 @@ function HeaderButton({
 
   return (
     <Pressable
-      style={[
-        styles.iconButton,
-        backgroundColor && { backgroundColor },
-      ]}
+      style={[styles.iconButton, backgroundColor && { backgroundColor }]}
       onPress={handlePress}
     >
       <Ionicons name={icon} size={22} color={color} />
@@ -62,11 +56,11 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
   const { profile, isLoading, error } = useProfile();
 
-  const iconColor = isDark ? '#FFFFFF' : '#1C1C1E';
-  
+  const iconColor = isDark ? "#FFFFFF" : "#1C1C1E";
+
   // Get avatar seed from profile or use default
   const getProfileAvatarUrl = () => {
     if (profile?.profile_picture_url) {
@@ -86,7 +80,6 @@ export function ChatHeader({
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
       {/* Top row with title and action buttons */}
       <View style={styles.topRow}>
-
         <ThemedText style={styles.title}>Chats</ThemedText>
 
         <View style={styles.rightSection}>
@@ -98,16 +91,13 @@ export function ChatHeader({
             color={iconColor}
           /> */}
 
-          <Pressable onPress={() => router.push('/profile')}>
+          <Pressable onPress={() => router.push("/profile")}>
             {isLoading ? (
               <ActivityIndicator size="small" color={iconColor} />
             ) : error ? (
               <Ionicons name="person" size={24} color={iconColor} />
             ) : (
-              <Image
-                source={{ uri: getProfileAvatarUrl() }}
-                style={styles.profileImage}
-              />
+              <Image source={{ uri: getProfileAvatarUrl() }} style={styles.profileImage} />
             )}
           </Pressable>
         </View>
@@ -131,31 +121,31 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   leftSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   rightSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   title: {
     fontSize: 24,
-    fontFamily: 'Roboto_700Bold',
+    fontFamily: "LINESeedSansTH_Bd",
     letterSpacing: -0.5,
   },
   iconButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   searchWrapper: {
     marginTop: 0,

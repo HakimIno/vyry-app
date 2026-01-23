@@ -1,26 +1,67 @@
-import React, { forwardRef, useImperativeHandle } from 'react';
-import { StyleSheet, View, FlatList, Pressable } from 'react-native';
-import { TrueSheet } from '@lodev09/react-native-true-sheet';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { Ionicons } from "@expo/vector-icons";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
+import { Image } from "expo-image";
+import React, { forwardRef, useImperativeHandle } from "react";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { ThemedText } from '../themed-text';
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { ThemedText } from "../themed-text";
 
 // Generate unique avatar seeds
 const AVATAR_SEEDS = [
-  'felix', 'luna', 'max', 'bella', 'charlie',
-  'coco', 'rocky', 'daisy', 'buddy', 'lucy',
-  'jack', 'lily', 'duke', 'sadie', 'bear',
-  'molly', 'tucker', 'sophie', 'oliver', 'chloe',
-  'belle', 'rex', 'will', 'sandy', 'milo',
-  'zoey', 'oscar', 'ruby', 'leo', 'mia',
-  'sam', 'ava', 'noah', 'emma', 'lucas',
-  'isabella', 'henry', 'olivia', 'ethan', 'sophia',
-  'alex', 'grace', 'daniel', 'ella', 'james',
-  'charlotte', 'benjamin', 'amelia', 'mason', 'harper',
-  'kim', 'snow'
+  "felix",
+  "luna",
+  "max",
+  "bella",
+  "charlie",
+  "coco",
+  "rocky",
+  "daisy",
+  "buddy",
+  "lucy",
+  "jack",
+  "lily",
+  "duke",
+  "sadie",
+  "bear",
+  "molly",
+  "tucker",
+  "sophie",
+  "oliver",
+  "chloe",
+  "belle",
+  "rex",
+  "will",
+  "sandy",
+  "milo",
+  "zoey",
+  "oscar",
+  "ruby",
+  "leo",
+  "mia",
+  "sam",
+  "ava",
+  "noah",
+  "emma",
+  "lucas",
+  "isabella",
+  "henry",
+  "olivia",
+  "ethan",
+  "sophia",
+  "alex",
+  "grace",
+  "daniel",
+  "ella",
+  "james",
+  "charlotte",
+  "benjamin",
+  "amelia",
+  "mason",
+  "harper",
+  "kim",
+  "snow",
 ];
 
 export interface AvatarPickerSheetRef {
@@ -34,7 +75,7 @@ interface AvatarPickerSheetProps {
 }
 
 export function getAvatarUrl(seed: string): string {
-  return `https://api.dicebear.com/7.x/avataaars/png?seed=${encodeURIComponent(seed)}&size=128`;
+  return `https://api.dicebear.com/7.x/avataaars/png?seed=${encodeURIComponent(seed)}&size=512`;
 }
 
 export { AVATAR_SEEDS };
@@ -43,7 +84,7 @@ export const AvatarPickerSheet = forwardRef<AvatarPickerSheetRef, AvatarPickerSh
   ({ selectedSeed, onAvatarSelect }, ref) => {
     const sheetRef = React.useRef<TrueSheet>(null);
     const colorScheme = useColorScheme();
-    const isDark = colorScheme === 'dark';
+    const isDark = colorScheme === "dark";
 
     useImperativeHandle(ref, () => ({
       present: () => {
@@ -64,16 +105,12 @@ export const AvatarPickerSheet = forwardRef<AvatarPickerSheetRef, AvatarPickerSh
 
       return (
         <Pressable
-          style={[
-            styles.avatarItem,
-            isSelected && styles.avatarItemSelected,
-          ]}
+          style={[styles.avatarItem, isSelected && styles.avatarItemSelected]}
           onPress={() => handleAvatarSelect(seed)}
         >
-          <View style={[
-            styles.avatarImageContainer,
-            isSelected && styles.avatarImageContainerSelected,
-          ]}>
+          <View
+            style={[styles.avatarImageContainer, isSelected && styles.avatarImageContainerSelected]}
+          >
             <Image
               source={{ uri: getAvatarUrl(seed) }}
               style={styles.avatarImage}
@@ -83,7 +120,7 @@ export const AvatarPickerSheet = forwardRef<AvatarPickerSheetRef, AvatarPickerSh
           </View>
           {isSelected && (
             <View style={styles.checkmark}>
-              <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
+              <Ionicons name="checkmark-circle" size={20} color="#6EE28B" />
             </View>
           )}
         </Pressable>
@@ -95,7 +132,7 @@ export const AvatarPickerSheet = forwardRef<AvatarPickerSheetRef, AvatarPickerSh
         ref={sheetRef}
         cornerRadius={16}
         detents={[0.6]}
-        backgroundColor={isDark ? '#1A1A1A' : '#FFFFFF'}
+        backgroundColor={isDark ? "#101010" : "#FFFFFF"}
         scrollable
       >
         <GestureHandlerRootView style={styles.container}>
@@ -111,7 +148,7 @@ export const AvatarPickerSheet = forwardRef<AvatarPickerSheetRef, AvatarPickerSh
                 showsVerticalScrollIndicator={false}
                 columnWrapperStyle={styles.row}
                 nestedScrollEnabled
-                overScrollMode='never'
+                overScrollMode="never"
               />
             </View>
           </View>
@@ -124,7 +161,7 @@ export const AvatarPickerSheet = forwardRef<AvatarPickerSheetRef, AvatarPickerSh
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    width: '100%',
+    width: "100%",
   },
   content: {
     flex: 1,
@@ -134,18 +171,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     margin: 8,
     letterSpacing: -0.3,
-    textAlign: 'center',
-    fontFamily: 'Roboto_700Bold',
-    
+    textAlign: "center",
+    fontFamily: "LINESeedSansTH_Bd",
   },
   subtitle: {
     fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
+    color: "#8E8E93",
+    textAlign: "center",
     marginBottom: 20,
   },
   subtitleDark: {
-    color: '#8E8E93',
+    color: "#8E8E93",
   },
   listContainer: {
     flex: 1,
@@ -154,15 +190,15 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   row: {
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     marginBottom: 16,
     paddingHorizontal: 4,
   },
   avatarItem: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '23%',
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "23%",
     minWidth: 70,
   },
   avatarItemSelected: {
@@ -172,25 +208,25 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(142, 142, 147, 0.1)',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarImageContainerSelected: {
     borderWidth: 3,
-    borderColor: '#007AFF',
+    borderColor: "#6EE28B",
   },
   avatarImage: {
     width: 64,
     height: 64,
-    marginTop: 8
+    marginTop: 8,
   },
   checkmark: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 4,
     right: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 10,
   },
 });

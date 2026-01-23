@@ -1,26 +1,17 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { StatusBar } from 'expo-status-bar';
-import { Redirect, Stack, useSegments } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import React, { useEffect } from 'react';
-import 'react-native-reanimated';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-import { AuthProvider, useAuth } from '@/features/auth/auth-context';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-import { useFonts } from '@expo-google-fonts/roboto';
-import {
-  Roboto_100Thin,
-  Roboto_300Light,
-  Roboto_400Regular,
-  Roboto_500Medium,
-  Roboto_700Bold,
-} from '@expo-google-fonts/roboto';
+import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { Redirect, Stack, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import React, { useEffect } from "react";
+import "react-native-reanimated";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useFonts } from "expo-font";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { AuthProvider, useAuth } from "@/features/auth/auth-context";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  anchor: "(tabs)",
 };
 
 // Prevent splash from auto-hiding until we're ready
@@ -36,16 +27,16 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
   const segments = useSegments();
 
-  const inAuthGroup = segments[0] === '(auth)';
+  const inAuthGroup = segments[0] === "(auth)";
   const currentRoute = segments[segments.length - 1] || segments[0];
 
   // Still loading - render nothing (splash screen is visible)
-  if (state.status === 'loading') {
+  if (state.status === "loading") {
     return null;
   }
 
   // Signed out - must be in auth flow
-  if (state.status === 'signedOut') {
+  if (state.status === "signedOut") {
     if (!inAuthGroup) {
       return <Redirect href="/(auth)/phone" />;
     }
@@ -55,30 +46,19 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Signed in - determine required destination
   const requiredSetup = state.requiresProfileSetup
-    ? 'profile'
+    ? "profile"
     : state.requiresPinSetup
-      ? 'pin-setup'
+      ? "pin-setup"
       : state.requiresPinVerify
-        ? 'pin-verify'
+        ? "pin-verify"
         : null;
 
-  if (__DEV__) {
-    console.log('[AuthGuard] State:', {
-      status: state.status,
-      requiresProfileSetup: state.requiresProfileSetup,
-      requiresPinSetup: state.requiresPinSetup,
-      requiresPinVerify: state.requiresPinVerify,
-      requiredSetup,
-      currentRoute,
-      inAuthGroup,
-    });
-  }
 
   if (requiredSetup) {
     // Need to complete setup - redirect if not on correct page
     if (currentRoute !== requiredSetup) {
       if (__DEV__) {
-        console.log('[AuthGuard] Redirecting to:', requiredSetup);
+        console.log("[AuthGuard] Redirecting to:", requiredSetup);
       }
       return <Redirect href={`/(auth)/${requiredSetup}` as const} />;
     }
@@ -88,7 +68,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   // All setup complete - should be in tabs
   if (inAuthGroup) {
     if (__DEV__) {
-      console.log('[AuthGuard] All setup complete, redirecting to tabs');
+      console.log("[AuthGuard] All setup complete, redirecting to tabs");
     }
     return <Redirect href="/(tabs)" />;
   }
@@ -98,7 +78,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
+  const theme = colorScheme === "dark" ? DarkTheme : DefaultTheme;
 
   return (
     <ThemeProvider value={theme}>
@@ -107,7 +87,7 @@ function RootLayoutContent() {
           <Stack
             screenOptions={{
               headerShown: false,
-              animation: 'default',
+              animation: "default",
               animationDuration: 200,
               freezeOnBlur: true,
             }}
@@ -124,11 +104,11 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Roboto_400Regular,
-    Roboto_700Bold,
-    Roboto_500Medium,
-    Roboto_300Light,
-    Roboto_100Thin,
+    LINESeedSansTH_Rg: require("../assets/font/LINESeedSansTH_A_Rg.ttf"),
+    LINESeedSansTH_Th: require("../assets/font/LINESeedSansTH_A_Th.ttf"),
+    LINESeedSansTH_Bd: require("../assets/font/LINESeedSansTH_A_Bd.ttf"),
+    LINESeedSansTH_XBd: require("../assets/font/LINESeedSansTH_A_XBd.ttf"),
+    LINESeedSansTH_He: require("../assets/font/LINESeedSansTH_A_He.ttf"),
   });
 
   useEffect(() => {

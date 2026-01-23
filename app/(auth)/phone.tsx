@@ -1,23 +1,23 @@
-import React, { useMemo, useState } from 'react';
-import { ImageBackground, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { requestOtp } from '@/features/auth/auth-api';
-import { HttpError } from '@/lib/http';
-import { IosButton } from '@/components/ui/ios-button';
-import { IosPhoneInput } from '@/components/ui/ios-phone-input';
-import { ThemedText } from '@/components/themed-text';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
+import { ImageBackground, KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ThemedText } from "@/components/themed-text";
+import { IosButton } from "@/components/ui/ios-button";
+import { IosPhoneInput } from "@/components/ui/ios-phone-input";
+import { requestOtp } from "@/features/auth/auth-api";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { HttpError } from "@/lib/http";
+import { Fonts } from "@/constants/theme";
 
 export default function PhoneScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
 
-  const [phone, setPhone] = useState('');
-  const [countryCode, setCountryCode] = useState('+1'); // Default to US
+  const [phone, setPhone] = useState("");
+  const [countryCode, setCountryCode] = useState("+1"); // Default to US
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,13 +34,13 @@ export default function PhoneScreen() {
       await requestOtp(fullPhoneNumber);
 
       // Navigate to OTP screen after successful OTP request
-      router.replace({ pathname: '/(auth)/otp', params: { phone: fullPhoneNumber } });
+      router.replace({ pathname: "/(auth)/otp", params: { phone: fullPhoneNumber } });
     } catch (e) {
       if (e instanceof HttpError) {
         const body = e.body as { error?: string; error_code?: string };
-        setError(body?.error ?? 'Unable to send verification code');
+        setError(body?.error ?? "Unable to send verification code");
       } else {
-        setError('Unable to send verification code');
+        setError("Unable to send verification code");
       }
     } finally {
       setLoading(false);
@@ -48,21 +48,17 @@ export default function PhoneScreen() {
   };
 
   return (
-    <ImageBackground
-      source={require('@/assets/bg.png')}
-      resizeMode="cover"
-      style={styles.bg}
-    >
+    <ImageBackground source={require("@/assets/bg.png")} resizeMode="cover" style={styles.bg}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
       >
-        <View style={[styles.body, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
+        <View
+          style={[styles.body, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}
+        >
           {/* Header */}
           <View style={styles.header}>
-            <ThemedText style={[styles.title, { color: '#FFFFFF' }]}>
-              Welcome back
-            </ThemedText>
+            <ThemedText style={[styles.title, { color: "#FFFFFF" }]}>Welcome back</ThemedText>
             <ThemedText style={[styles.subtitle, isDark && styles.subtitleDark]}>
               Enter your phone number to receive a verification code
             </ThemedText>
@@ -76,7 +72,7 @@ export default function PhoneScreen() {
               autoFocus
               value={phone}
               onChangeText={setPhone}
-              onCountryChange={(code, dialCode) => setCountryCode(dialCode)}
+              onCountryChange={(_code, dialCode) => setCountryCode(dialCode)}
               returnKeyType="done"
               onSubmitEditing={() => {
                 if (canSubmit) void onSubmit();
@@ -106,47 +102,46 @@ export default function PhoneScreen() {
 const styles = StyleSheet.create({
   bg: {
     flex: 1,
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   flex: {
     flex: 1,
   },
   body: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     marginHorizontal: 12,
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 48,
     marginBottom: 28,
     gap: 6,
   },
   title: {
     fontSize: 13,
-    fontWeight: '800',
-    fontFamily: 'Roboto_500Medium',
-    color: '#1C1C1E',
-    textAlign: 'center',
+    fontFamily: Fonts.bold,
+    color: "#1C1C1E",
+    textAlign: "center",
     lineHeight: 13 * 1.3,
   },
   titleDark: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   subtitle: {
     fontSize: 11,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    fontFamily: 'Roboto_400Regular',
+    color: "#FFFFFF",
+    textAlign: "center",
+    fontFamily: Fonts.regular,
     lineHeight: 11 * 1.3,
   },
   subtitleDark: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   form: {
     flex: 1,
-    width: '100%',
+    width: "100%",
     paddingHorizontal: 16,
     gap: 12,
   },
@@ -156,11 +151,11 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     fontSize: 11,
-    fontFamily: 'Roboto_400Regular',
-    color: '#FFFFFF',
-    textAlign: 'center',
+    fontFamily: "LINESeedSansTH_Rg",
+    color: "#FFFFFF",
+    textAlign: "center",
   },
   disclaimerDark: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
 });

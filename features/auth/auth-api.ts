@@ -1,17 +1,16 @@
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import Constants from "expo-constants";
+import { Platform } from "react-native";
+import { getApiBaseUrl, shouldUseMockApi } from "@/lib/env";
+import { apiFetch } from "@/lib/http";
 
-import { apiFetch } from '@/lib/http';
-import { shouldUseMockApi, getApiBaseUrl } from '@/lib/env';
-
-import type { VerifyOtpResponse } from './auth-types';
+import type { VerifyOtpResponse } from "./auth-types";
 
 /**
  * Log API request details for debugging
  */
 function logApiRequest(endpoint: string, method: string, body: unknown, isMock: boolean) {
   if (__DEV__) {
-    console.log(`[API ${isMock ? 'MOCK' : 'REAL'}] ${method} ${endpoint}`, {
+    console.log(`[API ${isMock ? "MOCK" : "REAL"}] ${method} ${endpoint}`, {
       url: `${getApiBaseUrl()}${endpoint}`,
       body,
       timestamp: new Date().toISOString(),
@@ -24,7 +23,7 @@ function logApiRequest(endpoint: string, method: string, body: unknown, isMock: 
  */
 function logApiResponse(endpoint: string, response: unknown, isMock: boolean) {
   if (__DEV__) {
-    console.log(`[API ${isMock ? 'MOCK' : 'REAL'}] Response from ${endpoint}`, {
+    console.log(`[API ${isMock ? "MOCK" : "REAL"}] Response from ${endpoint}`, {
       response,
       timestamp: new Date().toISOString(),
     });
@@ -34,18 +33,20 @@ function logApiResponse(endpoint: string, response: unknown, isMock: boolean) {
 /**
  * Mock implementation for requestOtp
  */
-async function mockRequestOtp(phoneNumber: string): Promise<{ message: string; expires_in_seconds: number }> {
-  logApiRequest('/api/v1/auth/request-otp', 'POST', { phone_number: phoneNumber }, true);
-  
+async function mockRequestOtp(
+  phoneNumber: string
+): Promise<{ message: string; expires_in_seconds: number }> {
+  logApiRequest("/api/v1/auth/request-otp", "POST", { phone_number: phoneNumber }, true);
+
   // Simulate network delay
   await new Promise((resolve) => setTimeout(resolve, 500));
-  
+
   const response = {
-    message: 'OTP sent successfully (MOCK)',
+    message: "OTP sent successfully (MOCK)",
     expires_in_seconds: 180,
   };
-  
-  logApiResponse('/api/v1/auth/request-otp', response, true);
+
+  logApiResponse("/api/v1/auth/request-otp", response, true);
   return response;
 }
 
@@ -58,29 +59,29 @@ async function mockVerifyOtp(params: {
   deviceUuid: string;
   deviceName?: string;
 }): Promise<VerifyOtpResponse> {
-  logApiRequest('/api/v1/auth/verify-otp', 'POST', params, true);
-  
+  logApiRequest("/api/v1/auth/verify-otp", "POST", params, true);
+
   // Simulate network delay
   await new Promise((resolve) => setTimeout(resolve, 800));
-  
+
   // Mock response - accept any 6-digit OTP for testing
   const isValidOtp = /^\d{6}$/.test(params.otp);
-  
+
   if (!isValidOtp) {
-    throw new Error('Invalid OTP format (MOCK)');
+    throw new Error("Invalid OTP format (MOCK)");
   }
-  
+
   const response: VerifyOtpResponse = {
-    access_token: 'mock_access_token_' + Date.now(),
-    refresh_token: 'mock_refresh_token_' + Date.now(),
-    user_id: 'mock_user_id_' + Date.now(),
+    access_token: `mock_access_token_${Date.now()}`,
+    refresh_token: `mock_refresh_token_${Date.now()}`,
+    user_id: `mock_user_id_${Date.now()}`,
     device_id: 1,
     is_new_user: true,
     requires_profile_setup: true,
     requires_pin: false,
   };
-  
-  logApiResponse('/api/v1/auth/verify-otp', response, true);
+
+  logApiResponse("/api/v1/auth/verify-otp", response, true);
   return response;
 }
 
@@ -89,24 +90,27 @@ async function mockVerifyOtp(params: {
  */
 export async function requestOtp(phoneNumber: string) {
   const useMock = shouldUseMockApi();
-  
+
   if (useMock) {
     return await mockRequestOtp(phoneNumber);
   }
-  
-  logApiRequest('/api/v1/auth/request-otp', 'POST', { phone_number: phoneNumber }, false);
-  
+
+  logApiRequest("/api/v1/auth/request-otp", "POST", { phone_number: phoneNumber }, false);
+
   try {
-    const response = await apiFetch<{ message: string; expires_in_seconds: number }>('/api/v1/auth/request-otp', {
-      method: 'POST',
-      body: { phone_number: phoneNumber },
-    });
-    
-    logApiResponse('/api/v1/auth/request-otp', response, false);
+    const response = await apiFetch<{ message: string; expires_in_seconds: number }>(
+      "/api/v1/auth/request-otp",
+      {
+        method: "POST",
+        body: { phone_number: phoneNumber },
+      }
+    );
+
+    logApiResponse("/api/v1/auth/request-otp", response, false);
     return response;
   } catch (error) {
     if (__DEV__) {
-      console.error('[API] requestOtp error:', error);
+      console.error("[API] requestOtp error:", error);
     }
     throw error;
   }
@@ -122,13 +126,14 @@ export async function verifyOtp(params: {
   deviceName?: string;
 }) {
   const useMock = shouldUseMockApi();
-  
+
   const platform =
-    Platform.OS === 'ios' ? 1 : Platform.OS === 'android' ? 2 : Platform.OS === 'web' ? 3 : 4;
+    Platform.OS === "ios" ? 1 : Platform.OS === "android" ? 2 : Platform.OS === "web" ? 3 : 4;
   const deviceName =
     params.deviceName ??
     // expo-constants has `deviceName` on some platforms; safe fallback.
-    ((Constants as unknown as { deviceName?: string }).deviceName ?? undefined);
+    (Constants as unknown as { deviceName?: string }).deviceName ??
+    undefined;
 
   const requestBody = {
     phone_number: params.phoneNumber,
@@ -141,20 +146,20 @@ export async function verifyOtp(params: {
   if (useMock) {
     return await mockVerifyOtp(params);
   }
-  
-  logApiRequest('/api/v1/auth/verify-otp', 'POST', requestBody, false);
-  
+
+  logApiRequest("/api/v1/auth/verify-otp", "POST", requestBody, false);
+
   try {
-    const response = await apiFetch<VerifyOtpResponse>('/api/v1/auth/verify-otp', {
-      method: 'POST',
+    const response = await apiFetch<VerifyOtpResponse>("/api/v1/auth/verify-otp", {
+      method: "POST",
       body: requestBody,
     });
-    
-    logApiResponse('/api/v1/auth/verify-otp', response, false);
+
+    logApiResponse("/api/v1/auth/verify-otp", response, false);
     return response;
   } catch (error) {
     if (__DEV__) {
-      console.error('[API] verifyOtp error:', error);
+      console.error("[API] verifyOtp error:", error);
     }
     throw error;
   }
@@ -173,8 +178,8 @@ export interface ProfileResponse {
 }
 
 export async function getProfile(): Promise<ProfileResponse> {
-  return await apiFetch<ProfileResponse>('/api/v1/auth/profile', {
-    method: 'GET',
+  return await apiFetch<ProfileResponse>("/api/v1/auth/profile", {
+    method: "GET",
     auth: true,
   });
 }
@@ -193,8 +198,8 @@ export async function setupProfile(params: {
     profile_picture_url: string | null;
     background_image_url: string | null;
     updated_at: string;
-  }>('/api/v1/auth/setup-profile', {
-    method: 'POST',
+  }>("/api/v1/auth/setup-profile", {
+    method: "POST",
     auth: true,
     body: {
       display_name: params.displayName,
@@ -210,23 +215,28 @@ export async function setupPin(params: {
   confirmPin: string;
   enableRegistrationLock: boolean;
 }) {
-  return await apiFetch<{ registration_lock_enabled: boolean; message: string }>('/api/v1/auth/setup-pin', {
-    method: 'POST',
-    auth: true,
-    body: {
-      pin: params.pin,
-      confirm_pin: params.confirmPin,
-      enable_registration_lock: params.enableRegistrationLock,
-    },
-  });
+  return await apiFetch<{ registration_lock_enabled: boolean; message: string }>(
+    "/api/v1/auth/setup-pin",
+    {
+      method: "POST",
+      auth: true,
+      body: {
+        pin: params.pin,
+        confirm_pin: params.confirmPin,
+        enable_registration_lock: params.enableRegistrationLock,
+      },
+    }
+  );
 }
 
 export async function verifyPin(pin: string) {
-  return await apiFetch<{ verified: boolean; attempts_remaining?: number | null; lockout_remaining_seconds?: number | null }>('/api/v1/auth/verify-pin', {
-    method: 'POST',
+  return await apiFetch<{
+    verified: boolean;
+    attempts_remaining?: number | null;
+    lockout_remaining_seconds?: number | null;
+  }>("/api/v1/auth/verify-pin", {
+    method: "POST",
     auth: true,
     body: { pin },
   });
 }
-
-

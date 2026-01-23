@@ -1,8 +1,8 @@
 // Chat-related type definitions
 
-export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
+export type MessageStatus = "sending" | "sent" | "delivered" | "read";
 
-export type FilterTab = 'all' | 'unread' | 'favourites' | 'groups';
+export type FilterTab = "all" | "unread" | "favourites" | "groups";
 
 export interface Conversation {
   id: string;

@@ -10,6 +10,7 @@ import { PinInput } from '@/components/ui/pin-input';
 import { NumericKeypad } from '@/components/ui/numeric-keypad';
 import { ThemedText } from '@/components/themed-text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Fonts } from '@/constants/theme';
 
 const PIN_LENGTH = 6;
 
@@ -216,7 +217,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 13,
-    fontFamily: 'Roboto_500Medium',
+    fontFamily: Fonts.medium,
     color: '#FFFFFF',
     textAlign: 'center',
     lineHeight: 13 * 1.3,
@@ -229,7 +230,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    fontFamily: 'Roboto_400Regular',
+    fontFamily: Fonts.regular,
     color: '#FF3B30',
     textAlign: 'center',
     marginTop: 8,
@@ -247,7 +248,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 11,
-    fontFamily: 'Roboto_400Regular',
+    fontFamily: Fonts.medium,
     color: '#FFFFFF',
     textAlign: 'center',
     opacity: 0.7,

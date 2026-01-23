@@ -1,10 +1,9 @@
-import React from 'react';
-import { StyleSheet } from 'react-native';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { IosButton } from '@/components/ui/ios-button';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { HttpError } from '@/lib/http';
+import { StyleSheet } from "react-native";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { IosButton } from "@/components/ui/ios-button";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { HttpError } from "@/lib/http";
 
 interface ErrorViewProps {
   error: Error | null;
@@ -13,21 +12,26 @@ interface ErrorViewProps {
   customMessage?: string;
 }
 
-export function ErrorView({ error, onRetry, retryTitle = 'ลองอีกครั้ง', customMessage }: ErrorViewProps) {
+export function ErrorView({
+  error,
+  onRetry,
+  retryTitle = "ลองอีกครั้ง",
+  customMessage,
+}: ErrorViewProps) {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const bgColor = isDark ? '#000000' : '#FFFFFF';
-  const placeholderColor = isDark ? '#636366' : '#8E8E93';
+  const isDark = colorScheme === "dark";
+  const bgColor = isDark ? "#000000" : "#FFFFFF";
+  const placeholderColor = isDark ? "#636366" : "#8E8E93";
 
   // Check if error is a network/connection error
   const isNetworkError = error instanceof HttpError && error.status === 0;
-  
-  let errorMessage = customMessage || 'ไม่สามารถโหลดข้อมูลได้';
-  
+
+  let errorMessage = customMessage || "ไม่สามารถโหลดข้อมูลได้";
+
   if (isNetworkError) {
-    errorMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\nกรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต';
+    errorMessage = "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\nกรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต";
   } else if (error) {
-    errorMessage = customMessage || 'ไม่สามารถโหลดข้อมูลได้';
+    errorMessage = customMessage || "ไม่สามารถโหลดข้อมูลได้";
   }
 
   return (
@@ -36,12 +40,7 @@ export function ErrorView({ error, onRetry, retryTitle = 'ลองอีกค�
         {errorMessage}
       </ThemedText>
       {onRetry && (
-        <IosButton
-          title={retryTitle}
-          onPress={onRetry}
-          style={{ marginTop: 24 }}
-          size='small'
-        />
+        <IosButton title={retryTitle} onPress={onRetry} style={{ marginTop: 24 }} size="small" />
       )}
     </ThemedView>
   );
@@ -50,14 +49,14 @@ export function ErrorView({ error, onRetry, retryTitle = 'ลองอีกค�
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 32,
   },
   errorText: {
     fontSize: 14,
-    textAlign: 'center',
-    fontFamily: 'Roboto_500Medium',
+    textAlign: "center",
+    fontFamily: "LINESeedSansTH_Rg",
     lineHeight: 24,
   },
 });

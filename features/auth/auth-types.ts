@@ -18,5 +18,3 @@ export type ApiError = {
   error_code: string;
   retry_after_seconds?: number;
 };
-
-

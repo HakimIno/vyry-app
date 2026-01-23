@@ -1,30 +1,26 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { StyleSheet, TextInput, View, Pressable, type TextInputProps } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { useRef, useState } from "react";
+import { Pressable, StyleSheet, TextInput, type TextInputProps, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { ThemedText } from '../themed-text';
-import { CountryPickerSheet, type CountryPickerSheetRef } from './country-picker-sheet';
-import { type Country } from '@/lib/countries-api';
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { type Country } from "@/lib/countries-api";
+import { ThemedText } from "../themed-text";
+import { CountryPickerSheet, type CountryPickerSheetRef } from "./country-picker-sheet";
 
 const AnimatedView = Animated.View;
 
 // Default country for initialization
 const DEFAULT_COUNTRY: Country = {
-  code: 'US',
-  flag: '🇺🇸',
-  dialCode: '+1',
-  name: 'United States',
+  code: "TH",
+  flag: "🇹🇭",
+  dialCode: "+66",
+  name: "Thailand",
 };
 
 // Format phone number: (201) 555-0123
-const formatPhoneNumber = (value: string): string => {
-  const digits = value.replace(/\D/g, '');
-  if (digits.length === 0) return '';
+const _formatPhoneNumber = (value: string): string => {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 0) return "";
   if (digits.length <= 3) return `(${digits}`;
   if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
@@ -32,17 +28,17 @@ const formatPhoneNumber = (value: string): string => {
 
 // Parse formatted phone to digits only
 const parsePhoneNumber = (value: string): string => {
-  return value.replace(/\D/g, '');
+  return value.replace(/\D/g, "");
 };
 
 export function IosPhoneInput({
-  value = '',
+  value = "",
   onChangeText,
   onCountryChange,
   errorText,
   containerStyle,
   ...props
-}: Omit<TextInputProps, 'value' | 'onChangeText'> & {
+}: Omit<TextInputProps, "value" | "onChangeText"> & {
   value?: string;
   onChangeText?: (text: string) => void;
   onCountryChange?: (countryCode: string, dialCode: string) => void;
@@ -50,18 +46,17 @@ export function IosPhoneInput({
   containerStyle?: object;
 }) {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
   const [isFocused, setIsFocused] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(DEFAULT_COUNTRY); // Default to US
   const borderScale = useSharedValue(0);
   const countrySheetRef = useRef<CountryPickerSheetRef>(null);
 
-  const bgColor = isDark ? 'rgba(118, 118, 128, 0.12)' : '#F2F2F7';
-  const textColor = isDark ? '#FFFFFF' : '#1C1C1E';
-  const placeholderColor = isDark ? '#636366' : '#8E8E93';
-  const focusBorderColor = isDark ? '#0A84FF' : '#007AFF';
-  const borderColor = isDark ? 'rgba(118, 118, 128, 0.3)' : 'rgba(0, 0, 0, 0.1)';
-
+  const bgColor = isDark ? "#101010" : "#F2F2F7";
+  const textColor = isDark ? "#FFFFFF" : "#1C1C1E";
+  const placeholderColor = isDark ? "#636366" : "#8E8E93";
+  const focusBorderColor = isDark ? "#0A84FF" : "#007AFF";
+  const borderColor = isDark ? "rgba(118, 118, 128, 0.3)" : "rgba(0, 0, 0, 0.1)";
 
   const animatedBorderStyle = useAnimatedStyle(() => ({
     transform: [{ scaleX: borderScale.value }],
@@ -109,7 +104,7 @@ export function IosPhoneInput({
               borderRightColor: borderColor,
             },
             isFocused && {
-              backgroundColor: isDark ? 'rgba(118, 118, 128, 0.18)' : '#E8E8ED',
+              backgroundColor: isDark ? "rgba(118, 118, 128, 0.18)" : "#E8E8ED",
             },
           ]}
         >
@@ -144,18 +139,12 @@ export function IosPhoneInput({
 
         {/* Focus Border */}
         <AnimatedView
-          style={[
-            styles.focusBorder,
-            { backgroundColor: focusBorderColor },
-            animatedBorderStyle,
-          ]}
+          style={[styles.focusBorder, { backgroundColor: focusBorderColor }, animatedBorderStyle]}
         />
       </View>
 
       {errorText && (
-        <ThemedText style={[styles.helperText, styles.errorText]}>
-          {errorText}
-        </ThemedText>
+        <ThemedText style={[styles.helperText, styles.errorText]}>{errorText}</ThemedText>
       )}
 
       {/* Country Picker Sheet */}
@@ -173,19 +162,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   inputWrapper: {
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: 12,
-    flexDirection: 'row',
+    position: "relative",
+    overflow: "hidden",
+    borderRadius: 13,
+    flexDirection: "row",
     borderWidth: 1,
   },
   countrySelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     borderRightWidth: 1,
-    minWidth: 80,
-    justifyContent: 'center',
+    minWidth: 70,
+    justifyContent: "center",
   },
   flag: {
     fontSize: 20,
@@ -194,32 +183,32 @@ const styles = StyleSheet.create({
   dropdownArrow: {
     width: 8,
     height: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   arrow: {
     fontSize: 8,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   phoneInputContainer: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 8,
   },
   countryCode: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   input: {
     flex: 1,
-    height: 44,
+    height: 42,
     fontSize: 14,
     letterSpacing: -0.2,
     paddingVertical: 0,
   },
   focusBorder: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
@@ -232,12 +221,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
   errorText: {
-    color: '#FF3B30',
+    color: "#FF3B30",
   },
   separator: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     marginRight: 4,
-  }
+  },
 });
-

@@ -1,22 +1,16 @@
-import React, { useRef, useState, useEffect } from 'react';
-import {
-  StyleSheet,
-  TextInput,
-  View,
-  Pressable,
-  Platform,
-  Dimensions,
-} from 'react-native';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from "expo-haptics";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Dimensions, Platform, StyleSheet, TextInput, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withSequence,
   withSpring,
   withTiming,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 
-import { ThemedText } from '../themed-text';
+import { ThemedText } from "../themed-text";
 
 interface OtpInputProps {
   length?: number;
@@ -26,7 +20,13 @@ interface OtpInputProps {
   error?: boolean;
 }
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
+const DIGIT_SIZE = width * 0.12;
+const ANIMATION_CONFIG = {
+  SPRING: { damping: 15, stiffness: 300 },
+  TIMING_FAST: { duration: 200 },
+  TIMING_SHAKE: { duration: 50 },
+};
 
 export function OtpInput({
   length = 6,
@@ -39,56 +39,61 @@ export function OtpInput({
   const [isFocused, setIsFocused] = useState(false);
   const shakeAnim = useSharedValue(0);
 
+  // Memoize digits array to prevent unnecessary recalculations
+  const digits = useMemo(() => value.split(""), [value]);
+
+  // Handle shake animation when error occurs
   useEffect(() => {
     if (error) {
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== "web") {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
+      
       shakeAnim.value = withSequence(
-        withTiming(-10, { duration: 50 }),
-        withTiming(10, { duration: 50 }),
-        withTiming(-10, { duration: 50 }),
-        withTiming(10, { duration: 50 }),
-        withTiming(0, { duration: 50 })
+        withTiming(-10, ANIMATION_CONFIG.TIMING_SHAKE),
+        withTiming(10, ANIMATION_CONFIG.TIMING_SHAKE),
+        withTiming(-10, ANIMATION_CONFIG.TIMING_SHAKE),
+        withTiming(10, ANIMATION_CONFIG.TIMING_SHAKE),
+        withTiming(0, ANIMATION_CONFIG.TIMING_SHAKE)
       );
+    } else {
+      shakeAnim.value = withTiming(0, ANIMATION_CONFIG.TIMING_FAST);
     }
-  }, [error]);
+  }, [error, shakeAnim]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shakeAnim.value }],
-  }));
-
-
-  const handleChange = (text: string) => {
-    const cleanText = text.replace(/\D/g, '').slice(0, length);
-    if (cleanText.length > value.length && Platform.OS !== 'web') {
+  // Optimized change handler with useCallback
+  const handleChange = useCallback((text: string) => {
+    const cleanText = text.replace(/\D/g, "").slice(0, length);
+    
+    // Provide haptic feedback when adding digits (not removing)
+    if (cleanText.length > value.length && Platform.OS !== "web") {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
+    
     onChange(cleanText);
-  };
+  }, [length, onChange, value.length]);
 
-  const digits = value.split('');
+  // Memoize animated style for the container
+  const containerAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shakeAnim.value }],
+  }));
 
   return (
     <View style={styles.container}>
       <Animated.View 
-        style={[styles.inputContainer, animatedStyle]}
+        style={[styles.inputContainer, containerAnimatedStyle]} 
         pointerEvents="none"
       >
-        {Array.from({ length }, (_, i) => {
-          const isActive = i === value.length && isFocused;
-          const isFilled = digits[i] !== undefined;
-
-          return (
-            <OtpDigitBox
-              key={i}
-              digit={digits[i]}
-              isActive={isActive}
-              isFilled={isFilled}
-              error={error}
-            />
-          );
-        })}
+        {Array.from({ length }, (_, i) => (
+          <OtpDigitBox
+            key={i}
+            index={i}
+            digit={digits[i]}
+            isActive={i === value.length && isFocused}
+            isFilled={i < value.length}
+            error={error}
+          />
+        ))}
       </Animated.View>
 
       <TextInput
@@ -113,76 +118,83 @@ export function OtpInput({
   );
 }
 
+interface OtpDigitBoxProps {
+  index: number;
+  digit?: string;
+  isActive: boolean;
+  isFilled: boolean;
+  error: boolean;
+}
+
 function OtpDigitBox({
   digit,
   isActive,
   isFilled,
   error,
-}: {
-  digit?: string;
-  isActive: boolean;
-  isFilled: boolean;
-  error: boolean;
-}) {
+}: OtpDigitBoxProps) {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.3);
 
+  // Handle scale and opacity animations when digit is filled
   useEffect(() => {
     if (isFilled) {
+      // More elegant scale animation
       scale.value = withSequence(
-        withSpring(1.05, { damping: 15, stiffness: 300 }),
-        withSpring(1, { damping: 15, stiffness: 300 })
+        withSpring(1.1, ANIMATION_CONFIG.SPRING),
+        withSpring(1, ANIMATION_CONFIG.SPRING)
       );
-      opacity.value = withTiming(1, { duration: 200 });
+      opacity.value = withTiming(1, ANIMATION_CONFIG.TIMING_FAST);
+    } else {
+      scale.value = withSpring(1, ANIMATION_CONFIG.SPRING);
+      opacity.value = withTiming(0.3, ANIMATION_CONFIG.TIMING_FAST);
     }
-  }, [isFilled]);
+  }, [isFilled, scale, opacity]);
 
+  // Handle active state opacity
   useEffect(() => {
-    if (isActive) {
-      opacity.value = withTiming(0.6, { duration: 200 });
+    if (isActive && !isFilled) {
+      opacity.value = withTiming(0.6, ANIMATION_CONFIG.TIMING_FAST);
     } else if (!isFilled) {
-      opacity.value = withTiming(0.3, { duration: 200 });
+      opacity.value = withTiming(0.3, ANIMATION_CONFIG.TIMING_FAST);
     }
-  }, [isActive, isFilled]);
+  }, [isActive, isFilled, opacity]);
 
+  // Memoize animated styles
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
     opacity: opacity.value,
   }));
 
-  const getBorderColor = () => {
-    if (error) return '#FF453A';
-    if (isActive) return '#0A84FF';
-    if (isFilled) return 'rgba(255, 255, 255, 0.6)';
-    return 'rgba(255, 255, 255, 0.3)';
-  };
+  // Memoize border and background colors
+  const borderStyle = useMemo(() => {
+    if (error) return styles.errorBorder;
+    if (isActive) return styles.activeBorder;
+    if (isFilled) return styles.filledBorder;
+    return styles.defaultBorder;
+  }, [error, isActive, isFilled]);
 
-  const getBackgroundColor = () => {
-    if (error) return 'rgba(255, 69, 58, 0.1)';
-    if (isActive) return 'rgba(10, 132, 255, 0.1)';
-    return 'rgba(255, 255, 255, 0.05)';
-  };
+  const backgroundStyle = useMemo(() => {
+    if (error) return styles.errorBackground;
+    if (isActive) return styles.activeBackground;
+    return styles.defaultBackground;
+  }, [error, isActive]);
 
   return (
     <Animated.View
       style={[
         styles.digitContainer,
-        {
-          width: width * 0.12,
-          height: width * 0.12,
-          borderColor: getBorderColor(),
-          backgroundColor: getBackgroundColor(),
-        },
+        borderStyle,
+        backgroundStyle,
         animatedStyle,
       ]}
     >
       <View style={styles.digitInnerContainer}>
         {digit ? (
-          <ThemedText style={styles.digit}>
-            {digit}
-          </ThemedText>
+          <ThemedText style={styles.digit}>{digit}</ThemedText>
         ) : isActive ? (
-          <View style={styles.cursor} />
+          <Animated.View style={styles.cursorContainer}>
+            <Animated.View style={styles.cursor} />
+          </Animated.View>
         ) : null}
       </View>
     </Animated.View>
@@ -191,46 +203,74 @@ function OtpDigitBox({
 
 const styles = StyleSheet.create({
   container: {
-    position: 'relative',
-    width: '100%',
-    alignItems: 'center',
+    position: "relative",
+    width: "100%",
+    alignItems: "center",
   },
   inputContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     gap: 12,
     zIndex: 1,
   },
   digitContainer: {
+    width: DIGIT_SIZE,
+    height: DIGIT_SIZE,
     borderRadius: 16,
     borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
+  defaultBorder: {
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  activeBorder: {
+    borderColor: "#0A84FF",
+  },
+  filledBorder: {
+    borderColor: "rgba(255, 255, 255, 0.6)",
+  },
+  errorBorder: {
+    borderColor: "#FF453A",
+  },
+  defaultBackground: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+  },
+  activeBackground: {
+    backgroundColor: "rgba(10, 132, 255, 0.1)",
+  },
+  errorBackground: {
+    backgroundColor: "rgba(255, 69, 58, 0.1)",
+  },
   digitInnerContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     flex: 1,
   },
   digit: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontWeight: "700",
+    color: "#FFFFFF",
     letterSpacing: -1,
+  },
+  cursorContainer: {
+    height: 28,
+    justifyContent: "center",
+    alignItems: "center",
   },
   cursor: {
     width: 3,
     height: 28,
-    backgroundColor: '#0A84FF',
+    backgroundColor: "#0A84FF",
     borderRadius: 2,
   },
   hiddenInput: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
