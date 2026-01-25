@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ImageBackground, KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { ImageBackground, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
@@ -20,7 +20,7 @@ export default function PinSetupScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const { completePinSetup } = useAuth();
+  const { completePinSetup, skipPinSetup } = useAuth();
 
   const [step, setStep] = useState<Step>('create');
   const [pin, setPin] = useState('');
@@ -49,6 +49,16 @@ export default function PinSetupScreen() {
 
   const completePinSetupRef = useRef(completePinSetup);
   completePinSetupRef.current = completePinSetup;
+
+  const handleSkipPinSetup = useCallback(async () => {
+    try {
+      // Mark PIN setup as skipped
+      await skipPinSetup();
+      // Navigation is handled by AuthGuard after state update
+    } catch (e) {
+      setError('ข้ามขั้นตอนไม่สำเร็จ');
+    }
+  }, [skipPinSetup]);
 
   const onSubmit = useCallback(async () => {
     if (pin !== confirmPin) {
@@ -166,11 +176,20 @@ export default function PinSetupScreen() {
               />
             </View>
             
-            {/* Footer text */}
+            {/* Footer text and skip button */}
             <View style={styles.footer}>
               <ThemedText style={[styles.footerText, { color: '#FFFFFF' }]}>
                 {subtitle}
               </ThemedText>
+              <TouchableOpacity 
+                style={styles.skipButton}
+                onPress={handleSkipPinSetup}
+                activeOpacity={0.7}
+              >
+                <ThemedText style={styles.skipButtonText}>
+                  ข้าม
+                </ThemedText>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -252,6 +271,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     opacity: 0.7,
+    marginBottom: 12,
+  },
+  skipButton: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  skipButtonText: {
+    fontSize: 14,
+    fontFamily: Fonts.medium,
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
   hiddenInput: {
     position: 'absolute',

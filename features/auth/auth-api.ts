@@ -232,11 +232,30 @@ export async function setupPin(params: {
 export async function verifyPin(pin: string) {
   return await apiFetch<{
     verified: boolean;
+    has_pin?: boolean; // Added to indicate if user has a PIN
     attempts_remaining?: number | null;
     lockout_remaining_seconds?: number | null;
   }>("/api/v1/auth/verify-pin", {
     method: "POST",
     auth: true,
     body: { pin },
+  });
+}
+
+export async function checkPinStatus() {
+  return await apiFetch<{
+    has_pin: boolean;
+  }>("/api/v1/auth/pin-status", {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function skipPinSetup() {
+  return await apiFetch<{
+    message: string;
+  }>("/api/v1/auth/skip-pin-setup", {
+    method: "POST",
+    auth: true,
   });
 }

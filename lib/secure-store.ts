@@ -7,6 +7,7 @@ type Key =
   | "auth.requiresProfileSetup"
   | "auth.requiresPinSetup"
   | "auth.requiresPinVerify"
+  | "auth.hasPin"
   | "auth.pinVerifiedAt"
   | "device.uuid"
   | "device.name"

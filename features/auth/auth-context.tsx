@@ -15,6 +15,7 @@ import { uuidv4 } from "@/lib/uuid";
 import { useProfileStore } from "@/stores/profile-store";
 
 import type { VerifyOtpResponse } from "./auth-types";
+import { useCheckPinStatus, useSkipPinSetup } from "./auth-hooks";
 
 type AuthState =
   | { status: "loading" }
@@ -26,6 +27,7 @@ type AuthState =
       requiresProfileSetup: boolean;
       requiresPinSetup: boolean;
       requiresPinVerify: boolean;
+      hasPin: boolean;
     };
 
 type AuthContextValue = {
@@ -35,6 +37,7 @@ type AuthContextValue = {
   setSessionFromVerifyOtp: (resp: VerifyOtpResponse) => Promise<void>;
   completeProfileSetup: () => Promise<void>;
   completePinSetup: () => Promise<void>;
+  skipPinSetup: () => Promise<void>;
   completePinVerify: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -48,6 +51,7 @@ const AUTH_KEYS = {
   REQUIRES_PROFILE_SETUP: "auth.requiresProfileSetup",
   REQUIRES_PIN_SETUP: "auth.requiresPinSetup",
   REQUIRES_PIN_VERIFY: "auth.requiresPinVerify",
+  HAS_PIN: "auth.hasPin",
   DEVICE_UUID: "device.uuid",
 } as const;
 
@@ -72,6 +76,7 @@ class AuthStorage {
       requiresProfileSetup,
       requiresPinSetup,
       requiresPinVerify,
+      hasPin,
     ] = await Promise.all([
       SecureKV.get(AUTH_KEYS.ACCESS_TOKEN),
       SecureKV.get(AUTH_KEYS.REFRESH_TOKEN),
@@ -79,6 +84,7 @@ class AuthStorage {
       SecureKV.get(AUTH_KEYS.REQUIRES_PROFILE_SETUP),
       SecureKV.get(AUTH_KEYS.REQUIRES_PIN_SETUP),
       SecureKV.get(AUTH_KEYS.REQUIRES_PIN_VERIFY),
+      SecureKV.get(AUTH_KEYS.HAS_PIN),
     ]);
 
     return {
@@ -88,6 +94,7 @@ class AuthStorage {
       requiresProfileSetup: parseBool(requiresProfileSetup),
       requiresPinSetup: parseBool(requiresPinSetup),
       requiresPinVerify: parseBool(requiresPinVerify),
+      hasPin: parseBool(hasPin),
     };
   }
 
@@ -97,6 +104,7 @@ class AuthStorage {
     requiresProfileSetup: boolean;
     requiresPinSetup: boolean;
     requiresPinVerify: boolean;
+    hasPin?: boolean;
   }) {
     await Promise.all([
       SecureKV.set(AUTH_KEYS.ACCESS_TOKEN, data.accessToken),
@@ -104,6 +112,7 @@ class AuthStorage {
       SecureKV.set(AUTH_KEYS.REQUIRES_PROFILE_SETUP, String(data.requiresProfileSetup)),
       SecureKV.set(AUTH_KEYS.REQUIRES_PIN_SETUP, String(data.requiresPinSetup)),
       SecureKV.set(AUTH_KEYS.REQUIRES_PIN_VERIFY, String(data.requiresPinVerify)),
+      SecureKV.set(AUTH_KEYS.HAS_PIN, String(data.hasPin ?? true)),
     ]);
   }
 
@@ -112,6 +121,7 @@ class AuthStorage {
       requiresProfileSetup: boolean;
       requiresPinSetup: boolean;
       requiresPinVerify: boolean;
+      hasPin: boolean;
     }>
   ) {
     const promises: Promise<void>[] = [];
@@ -127,6 +137,9 @@ class AuthStorage {
     if (updates.requiresPinVerify !== undefined) {
       promises.push(SecureKV.set(AUTH_KEYS.REQUIRES_PIN_VERIFY, String(updates.requiresPinVerify)));
     }
+    if (updates.hasPin !== undefined) {
+      promises.push(SecureKV.set(AUTH_KEYS.HAS_PIN, String(updates.hasPin)));
+    }
 
     await Promise.all(promises);
   }
@@ -138,6 +151,7 @@ class AuthStorage {
       SecureKV.del(AUTH_KEYS.REQUIRES_PROFILE_SETUP),
       SecureKV.del(AUTH_KEYS.REQUIRES_PIN_SETUP),
       SecureKV.del(AUTH_KEYS.REQUIRES_PIN_VERIFY),
+      SecureKV.del(AUTH_KEYS.HAS_PIN),
     ]);
   }
 
@@ -156,6 +170,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [deviceUuid, setDeviceUuid] = useState<string | null>(null);
   const bootstrapRunRef = useRef(false);
   const stateSnapshotRef = useRef<AuthState>({ status: "loading" });
+  const checkPinStatusMutation = useCheckPinStatus();
+  const skipPinSetupMutation = useSkipPinSetup();
 
   // Update snapshot whenever state changes
   useEffect(() => {
@@ -190,41 +206,90 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Restore session if tokens exist
       if (stored.accessToken && stored.refreshToken) {
-        setState((current) => {
-          // Never override verified state
-          if (shouldPreserveState(current)) {
-            if (__DEV__) {
-              console.log("[Auth] Bootstrap: Preserving verified state");
+        // Check PIN status from API
+        try {
+          const pinStatus = await checkPinStatusMutation.mutateAsync();
+          
+          setState((current) => {
+            // Never override verified state
+            if (shouldPreserveState(current)) {
+              if (__DEV__) {
+                console.log("[Auth] Bootstrap: Preserving verified state");
+              }
+              return current;
             }
+
+            // Initial bootstrap or signed out
+            if (current.status === "loading" || current.status === "signedOut") {
+              return {
+                status: "signedIn",
+                accessToken: stored.accessToken!,
+                refreshToken: stored.refreshToken!,
+                requiresProfileSetup: stored.requiresProfileSetup,
+                requiresPinSetup: stored.requiresPinSetup,
+                requiresPinVerify: pinStatus.has_pin ? stored.requiresPinVerify : false,
+                hasPin: pinStatus.has_pin,
+              };
+            }
+
+            // Update tokens if changed
+            if (isSignedIn(current) && current.accessToken !== stored.accessToken) {
+              return {
+                ...current,
+                accessToken: stored.accessToken!,
+                refreshToken: stored.refreshToken!,
+                requiresProfileSetup: stored.requiresProfileSetup,
+                requiresPinSetup: stored.requiresPinSetup,
+                requiresPinVerify: pinStatus.has_pin ? stored.requiresPinVerify : false,
+                hasPin: pinStatus.has_pin,
+              };
+            }
+
             return current;
+          });
+        } catch (error) {
+          if (__DEV__) {
+            console.log("[Auth] Error checking PIN status during bootstrap:", error);
           }
+          // If we can't check PIN status, use stored values with hasPin defaulting to false
+          setState((current) => {
+            // Never override verified state
+            if (shouldPreserveState(current)) {
+              if (__DEV__) {
+                console.log("[Auth] Bootstrap: Preserving verified state");
+              }
+              return current;
+            }
 
-          // Initial bootstrap or signed out
-          if (current.status === "loading" || current.status === "signedOut") {
-            return {
-              status: "signedIn",
-              accessToken: stored.accessToken!,
-              refreshToken: stored.refreshToken!,
-              requiresProfileSetup: stored.requiresProfileSetup,
-              requiresPinSetup: stored.requiresPinSetup,
-              requiresPinVerify: stored.requiresPinVerify,
-            };
-          }
+            // Initial bootstrap or signed out
+            if (current.status === "loading" || current.status === "signedOut") {
+              return {
+                status: "signedIn",
+                accessToken: stored.accessToken!,
+                refreshToken: stored.refreshToken!,
+                requiresProfileSetup: stored.requiresProfileSetup,
+                requiresPinSetup: stored.requiresPinSetup,
+                requiresPinVerify: false, // Default to false when we can't verify
+                hasPin: false, // Default to false when we can't verify
+              };
+            }
 
-          // Update tokens if changed
-          if (isSignedIn(current) && current.accessToken !== stored.accessToken) {
-            return {
-              ...current,
-              accessToken: stored.accessToken!,
-              refreshToken: stored.refreshToken!,
-              requiresProfileSetup: stored.requiresProfileSetup,
-              requiresPinSetup: stored.requiresPinSetup,
-              requiresPinVerify: stored.requiresPinVerify,
-            };
-          }
+            // Update tokens if changed
+            if (isSignedIn(current) && current.accessToken !== stored.accessToken) {
+              return {
+                ...current,
+                accessToken: stored.accessToken!,
+                refreshToken: stored.refreshToken!,
+                requiresProfileSetup: stored.requiresProfileSetup,
+                requiresPinSetup: stored.requiresPinSetup,
+                requiresPinVerify: false, // Default to false when we can't verify
+                hasPin: false, // Default to false when we can't verify
+              };
+            }
 
-          return current;
-        });
+            return current;
+          });
+        }
       } else {
         setState((current) => (current.status === "signedOut" ? current : { status: "signedOut" }));
       }
@@ -248,6 +313,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       requiresProfileSetup: resp.requires_profile_setup,
       requiresPinSetup: resp.requires_profile_setup ? true : resp.is_new_user,
       requiresPinVerify: resp.requires_pin && !resp.requires_profile_setup,
+      hasPin: resp.requires_pin && !resp.is_new_user, // Only has PIN if it's required and not a new user
     };
 
     await AuthStorage.setSession(sessionData);
@@ -276,9 +342,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     setState((s) =>
-      isSignedIn(s) ? { ...s, requiresPinSetup: false, requiresPinVerify: false } : s
+      isSignedIn(s) ? { ...s, requiresPinSetup: false, requiresPinVerify: false, hasPin: true } : s
     );
   }, []);
+
+  const skipPinSetup = useCallback(async () => {
+    try {
+      // Call API to skip PIN setup
+      await skipPinSetupMutation.mutateAsync();
+      
+      // Update local state
+      await AuthStorage.updateFlags({
+        requiresPinSetup: false,
+        requiresPinVerify: false,
+      });
+
+      setState((s) =>
+        isSignedIn(s) ? { ...s, requiresPinSetup: false, requiresPinVerify: false, hasPin: false } : s
+      );
+    } catch (error) {
+      if (__DEV__) {
+        console.log("[Auth] Error skipping PIN setup:", error);
+      }
+      throw error;
+    }
+  }, [skipPinSetupMutation]);
 
   const completePinVerify = useCallback(async () => {
     // Update storage to persist verification during current session
@@ -320,14 +408,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // When app goes to background, require PIN verification on next foreground
+      // When app goes to background, check PIN status on next foreground
       if (isBackgrounding) {
+        // Don't update state immediately, we'll check PIN status when app comes to foreground
+        if (__DEV__) {
+          console.log("[Auth] App backgrounding, will check PIN status on foreground");
+        }
+      }
+      
+      // When app comes to foreground, check if user has a PIN
+      if (isForegrounding) {
         const currentState = stateSnapshotRef.current;
         if (isSignedIn(currentState) && !currentState.requiresPinVerify) {
-          await AuthStorage.updateFlags({
-            requiresPinVerify: true,
-          });
-          setState((s) => (isSignedIn(s) ? { ...s, requiresPinVerify: true } : s));
+          try {
+            const pinStatus = await checkPinStatusMutation.mutateAsync();
+            if (pinStatus.has_pin) {
+              await AuthStorage.updateFlags({
+                requiresPinVerify: true,
+              });
+              setState((s) => (isSignedIn(s) ? { ...s, requiresPinVerify: true, hasPin: true } : s));
+              if (__DEV__) {
+                console.log("[Auth] User has PIN, requiring verification");
+              }
+            } else {
+              await AuthStorage.updateFlags({
+                requiresPinVerify: false,
+                hasPin: false,
+              });
+              setState((s) => (isSignedIn(s) ? { ...s, requiresPinVerify: false, hasPin: false } : s));
+              if (__DEV__) {
+                console.log("[Auth] User does not have PIN, skipping verification");
+              }
+            }
+          } catch (error) {
+            if (__DEV__) {
+              console.log("[Auth] Error checking PIN status:", error);
+            }
+            // If we can't check PIN status, assume no PIN for better UX
+            await AuthStorage.updateFlags({
+              requiresPinVerify: false,
+              hasPin: false,
+            });
+            setState((s) => (isSignedIn(s) ? { ...s, requiresPinVerify: false, hasPin: false } : s));
+          }
         }
       }
 
@@ -359,6 +482,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSessionFromVerifyOtp,
       completeProfileSetup,
       completePinSetup,
+      skipPinSetup,
       completePinVerify,
       signOut,
     }),
@@ -369,6 +493,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSessionFromVerifyOtp,
       completeProfileSetup,
       completePinSetup,
+      skipPinSetup,
       completePinVerify,
       signOut,
     ]

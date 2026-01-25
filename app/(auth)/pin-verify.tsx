@@ -85,6 +85,13 @@ export default function PinVerifyScreen() {
       try {
         const res = await mutateAsyncRef.current('000000');
         
+        // Check if user has a PIN
+        if (res.has_pin === false) {
+          // User doesn't have a PIN, skip verification
+          await completePinVerifyRef.current();
+          return;
+        }
+        
         if (res.attempts_remaining === 0 && res.lockout_remaining_seconds) {
           setAttemptsRemaining(0);
           setLockoutRemainingSeconds(res.lockout_remaining_seconds);
@@ -95,6 +102,19 @@ export default function PinVerifyScreen() {
       } catch (e) {
         if (__DEV__) {
           console.log('[PinVerify] Error checking lockout status:', e);
+        }
+        
+        // If there's an error checking PIN, check if it's because user doesn't have a PIN
+        // This might need to be adjusted based on actual API error responses
+        try {
+          const errorBody = (e as any)?.body;
+          if (errorBody?.error_code === 'NO_PIN_SET') {
+            // User doesn't have a PIN, skip verification
+            await completePinVerifyRef.current();
+            return;
+          }
+        } catch (parseError) {
+          // Ignore parsing errors
         }
       } finally {
         setIsCheckingLockout(false);

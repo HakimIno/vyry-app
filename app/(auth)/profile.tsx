@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_RADIUS,
-    backgroundColor: "rgba(55, 49, 49, 0.9)",
+    backgroundColor: "rgba(9, 9, 9, 1)",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",

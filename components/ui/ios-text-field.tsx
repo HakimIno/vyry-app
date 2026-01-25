@@ -14,12 +14,16 @@ export function IosTextField({
   helperText,
   errorText,
   containerStyle,
+  showCharacterCount,
+  maxLength,
   ...props
 }: TextInputProps & {
   label?: string;
   helperText?: string;
   errorText?: string;
   containerStyle?: object;
+  showCharacterCount?: boolean;
+  maxLength?: number;
 }) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -80,6 +84,13 @@ export function IosTextField({
       {!errorText && helperText && (
         <ThemedText style={[styles.helperText, { color: labelColor }]}>{helperText}</ThemedText>
       )}
+      {showCharacterCount && (
+        <View style={styles.characterCountContainer}>
+          <ThemedText style={[styles.characterCount, { color: labelColor }]}>
+            {props.value?.length || 0}{maxLength ? `/${maxLength}` : ''}
+          </ThemedText>
+        </View>
+      )}
     </View>
   );
 }
@@ -108,6 +119,8 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     paddingHorizontal: 12,
     fontFamily: Fonts.regular,
+    minHeight: 48,
+    textAlignVertical: 'top',
   },
   focusBorder: {
     position: "absolute",
@@ -123,5 +136,14 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "#FF3B30",
+  },
+  characterCountContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
+  characterCount: {
+    fontSize: 12,
+    fontFamily: Fonts.regular,
   },
 });
