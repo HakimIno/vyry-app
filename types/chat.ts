@@ -11,6 +11,7 @@ export interface Conversation {
   timestamp: string;
   unreadCount: number;
   avatarSeed: string;
+  avatarUrl?: string;
   isOnline?: boolean;
   isTyping?: boolean;
   isPinned?: boolean;

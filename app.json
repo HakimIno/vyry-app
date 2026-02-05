@@ -48,7 +48,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "apiBaseUrl": "http://10.39.116.21:8000",
+      "apiBaseUrl": "http://172.20.168.21:8000",
       "useMockApi": false,
       "router": {},
       "eas": {

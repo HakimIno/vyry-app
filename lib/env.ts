@@ -11,7 +11,7 @@ export function getApiBaseUrl() {
   let baseUrl = extra.apiBaseUrl?.replace(/\/+$/, "") ?? "http://localhost:8000";
 
   // For Android emulator, only replace localhost/127.0.0.1 with 10.0.2.2
-  // If a specific IP address is configured (like 10.39.116.21), use it as is
+  // If a specific IP address is configured (like 172.20.168.21), use it as is
   if (Platform.OS === "android") {
     // Only replace localhost or 127.0.0.1 with 10.0.2.2
     // Keep configured IP addresses as they are

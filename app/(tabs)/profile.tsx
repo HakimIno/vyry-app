@@ -23,7 +23,7 @@ import { IosTextField } from "@/components/ui/ios-text-field";
 import { useAuth } from "@/features/auth/auth-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useProfileStore } from "@/stores/profile-store";
-import { Fonts } from "@/constants/theme";
+import { AvatarColors, Fonts, ProfileColors, ProfileDimensions } from "@/constants/theme";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -34,11 +34,12 @@ export default function ProfileScreen() {
   const [selectedAvatarSeed, setSelectedAvatarSeed] = useState(AVATAR_SEEDS[0]);
   const [selectedBackgroundImage, setSelectedBackgroundImage] = useState<string | null>(null);
 
-  const bgColor = isDark ? "#000000" : "#F5F5F7";
-  const cardBgColor = isDark ? "#000000" : "#FFFFFF";
-  const borderColor = isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)";
-  const placeholderColor = isDark ? "#8E8E93" : "#6C6C70";
-  const secondaryBgColor = isDark ? "#2C2C2E" : "#F2F2F7";
+  const profileColors = ProfileColors[colorScheme as keyof typeof ProfileColors];
+  const bgColor = profileColors.background;
+  const cardBgColor = profileColors.cardBackground;
+  const borderColor = profileColors.border;
+  const placeholderColor = profileColors.placeholder;
+  const secondaryBgColor = profileColors.secondaryBackground;
 
   // Fetch profile data
   const { profile, isLoading, error, refetch } = useProfileStore();
@@ -84,7 +85,7 @@ export default function ProfileScreen() {
   if (isLoading) {
     return (
       <ThemedView style={[styles.container, styles.centerContainer, { backgroundColor: bgColor }]}>
-        <ActivityIndicator size="large" color={isDark ? "#FFFFFF" : "#000000"} />
+        <ActivityIndicator size="large" color={profileColors.text} />
       </ThemedView>
     );
   }
@@ -108,11 +109,11 @@ export default function ProfileScreen() {
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top, borderBottomColor: borderColor }]}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={isDark ? "#FFFFFF" : "#000000"} />
+            <Ionicons name="arrow-back" size={24} color={profileColors.text} />
           </Pressable>
           <ThemedText style={styles.headerTitle}>โปรไฟล์</ThemedText>
           <Pressable onPress={handleEdit} style={styles.editButton}>
-            <FontAwesome6 name="edit" size={20} color={isDark ? "#FFFFFF" : "#000000"} />
+            <FontAwesome6 name="edit" size={20} color={profileColors.text} />
           </Pressable>
         </View>
 
@@ -135,7 +136,7 @@ export default function ProfileScreen() {
                 <View
                   style={[
                     styles.backgroundImage,
-                    { backgroundColor: isDark ? "#2C2C2E" : "#E5E5EA" },
+                    { backgroundColor: profileColors.defaultBackground },
                   ]}
                 />
               )}
@@ -145,7 +146,7 @@ export default function ProfileScreen() {
 
             {/* Avatar */}
             <View style={styles.avatarWrapper}>
-              <View style={[styles.avatarContainer, { borderColor: cardBgColor }]}>
+              <View style={[styles.avatarContainer, { borderColor: AvatarColors[colorScheme as keyof typeof AvatarColors].border, backgroundColor: AvatarColors[colorScheme as keyof typeof AvatarColors].bg }]}>
                 <Image
                   source={{ uri: getAvatarUrl(selectedAvatarSeed) }}
                   style={styles.avatar}
@@ -183,7 +184,7 @@ export default function ProfileScreen() {
               >
                 <View style={styles.settingsItemLeft}>
                   <View style={[styles.iconContainer, { backgroundColor: secondaryBgColor }]}>
-                    <Ionicons name="notifications" size={20} color={isDark ? "#FFFFFF" : "#000000"} />
+                    <Ionicons name="notifications" size={20} color={profileColors.text} />
                   </View>
                   <ThemedText style={styles.settingsItemText}>การแจ้งเตือน</ThemedText>
                 </View>
@@ -196,7 +197,7 @@ export default function ProfileScreen() {
               >
                 <View style={styles.settingsItemLeft}>
                   <View style={[styles.iconContainer, { backgroundColor: secondaryBgColor }]}>
-                    <Ionicons name="shield-checkmark" size={20} color={isDark ? "#FFFFFF" : "#000000"} />
+                    <Ionicons name="shield-checkmark" size={20} color={profileColors.text} />
                   </View>
                   <ThemedText style={styles.settingsItemText}>ความเป็นส่วนตัว</ThemedText>
                 </View>
@@ -209,7 +210,7 @@ export default function ProfileScreen() {
               >
                 <View style={styles.settingsItemLeft}>
                   <View style={[styles.iconContainer, { backgroundColor: secondaryBgColor }]}>
-                    <MaterialIcons name="help-outline" size={20} color={isDark ? "#FFFFFF" : "#000000"} />
+                    <MaterialIcons name="help-outline" size={20} color={profileColors.text} />
                   </View>
                   <ThemedText style={styles.settingsItemText}>ช่วยเหลือและสนับสนุน</ThemedText>
                 </View>
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: ProfileDimensions.header.paddingHorizontal,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: {
@@ -261,20 +262,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 8,
-    paddingTop: 8,
+    paddingHorizontal: ProfileDimensions.content.paddingHorizontal,
+    paddingTop: ProfileDimensions.content.paddingTop,
   },
 
   // Profile Card
   profileCard: {
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: ProfileDimensions.profileCard.borderRadius,
     overflow: "hidden",
-    marginBottom: 8,
+    marginBottom: ProfileDimensions.profileCard.marginBottom,
   },
   backgroundContainer: {
     width: "100%",
-    height: 120,
+    height: ProfileDimensions.background.height,
     position: "relative",
   },
   backgroundImage: {
@@ -286,47 +286,46 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 10,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    height: ProfileDimensions.background.gradientHeight,
+    borderTopLeftRadius: ProfileDimensions.background.gradientRadius,
+    borderTopRightRadius: ProfileDimensions.background.gradientRadius,
   },
   avatarWrapper: {
     alignItems: "center",
-    marginTop: -55,
-    marginBottom: 12,
+    marginTop: ProfileDimensions.avatar.wrapper.marginTop,
+    marginBottom: ProfileDimensions.avatar.wrapper.marginBottom,
   },
   avatarContainer: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: ProfileDimensions.avatar.container.width,
+    height: ProfileDimensions.avatar.container.height,
+    borderRadius: ProfileDimensions.avatar.container.borderRadius,
     overflow: "hidden",
-    borderWidth: 4,
+    borderWidth: ProfileDimensions.avatar.container.borderWidth,
   },
   avatar: {
     width: "100%",
     height: "100%",
   },
   profileInfo: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: ProfileDimensions.profileInfo.paddingHorizontal,
+    paddingBottom: ProfileDimensions.profileInfo.paddingBottom,
     alignItems: "center",
   },
   displayName: {
-    fontSize: 24,
+    fontSize: ProfileDimensions.displayName.fontSize,
     fontFamily: Fonts.bold,
-    marginBottom: 10,
+    marginBottom: ProfileDimensions.displayName.marginBottom,
     textAlign: "center",
   },
   bioText: {
     fontFamily: Fonts.regular,
-    textAlign: "center",
+    textAlign: ProfileDimensions.bioText.textAlign,
   },
 
   // Stats
   statsContainer: {
     flexDirection: "row",
     borderRadius: 12,
-    borderWidth: 1,
     padding: 16,
     marginBottom: 24,
   },
@@ -353,34 +352,32 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: ProfileDimensions.sectionTitle.fontSize,
     fontFamily: Fonts.bold,
     textTransform: "uppercase",
-    marginBottom: 8,
-    paddingHorizontal: 4,
+    marginBottom: ProfileDimensions.sectionTitle.marginBottom,
+    paddingHorizontal: ProfileDimensions.sectionTitle.paddingHorizontal,
   },
   settingsCard: {
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: ProfileDimensions.settingsCard.borderRadius,
     overflow: "hidden",
   },
   settingsItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: ProfileDimensions.settingsItem.paddingVertical,
+    paddingHorizontal: ProfileDimensions.settingsItem.paddingHorizontal,
   },
   settingsItemLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: ProfileDimensions.settingsItem.gap,
   },
   iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 108,
+    width: ProfileDimensions.iconContainer.width,
+    height: ProfileDimensions.iconContainer.height,
+    borderRadius: ProfileDimensions.iconContainer.borderRadius,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -391,7 +388,7 @@ const styles = StyleSheet.create({
 
   // Logout
   logoutContainer: {
-    margin: 20,
+    margin: ProfileDimensions.logoutContainer.margin,
 
   },
 

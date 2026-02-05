@@ -18,8 +18,8 @@ interface ConversationItemProps {
 
 // Sub-component: Avatar with online status ring
 const AvatarWithStatus = React.memo(
-  ({ seed, isOnline, size = 56 }: { seed: string; isOnline?: boolean; size?: number }) => {
-    const avatarUrl = getAvatarUrl(seed);
+  ({ seed, url, isOnline, size = 56 }: { seed: string; url?: string; isOnline?: boolean; size?: number }) => {
+    const avatarUrl = url || getAvatarUrl(seed);
     const ringSize = size + 6;
 
     return (
@@ -154,7 +154,11 @@ export const ConversationItem = React.memo(
       >
         {/* Avatar */}
         <View style={styles.avatarContainer}>
-          <AvatarWithStatus seed={conversation.avatarSeed} isOnline={conversation.isOnline} />
+          <AvatarWithStatus
+            seed={conversation.avatarSeed}
+            url={conversation.avatarUrl}
+            isOnline={conversation.isOnline}
+          />
         </View>
 
         {/* Content */}

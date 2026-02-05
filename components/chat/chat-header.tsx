@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useProfile } from "@/stores/profile-store";
+import { usePendingRequests } from "@/hooks/use-friends";
 import { AVATAR_SEEDS, getAvatarUrl } from "../ui/avatar-picker-sheet";
 import { SearchBar } from "./search-bar";
 
@@ -58,6 +59,8 @@ export function ChatHeader({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const { profile, isLoading, error } = useProfile();
+  const { data: pendingRequests } = usePendingRequests();
+  const requestCount = pendingRequests?.length ?? 0;
 
   const iconColor = isDark ? "#FFFFFF" : "#1C1C1E";
 
@@ -85,11 +88,23 @@ export function ChatHeader({
         <View style={styles.rightSection}>
           {/* Profile */}
 
-          {/* <HeaderButton
-            icon="person"
-            onPress={() => router.push('/profile')}
-            color={iconColor}
-          /> */}
+
+          <Pressable onPress={() => router.push("/users/requests")} style={styles.iconButton}>
+            <View>
+              <Ionicons name="people-outline" size={24} color={iconColor} />
+              {requestCount > 0 && (
+                <View style={styles.badge}>
+                  <ThemedText style={styles.badgeText}>
+                    {requestCount > 99 ? "99+" : requestCount}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+          </Pressable>
+
+          <Pressable onPress={() => onNewChatPress?.()}>
+            <Ionicons name="person-add-outline" size={24} color={iconColor} />
+          </Pressable>
 
           <Pressable onPress={() => router.push("/profile")}>
             {isLoading ? (
@@ -154,5 +169,24 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
+  },
+  badge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    backgroundColor: "#FF3B30",
+    borderRadius: 10,
+    minWidth: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
+    fontFamily: "LINESeedSansTH_Bd",
+    lineHeight: 12, // Adjust vertically
   },
 });

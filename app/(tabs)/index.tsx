@@ -4,16 +4,34 @@ import * as Haptics from "expo-haptics";
 import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { ChatHeader } from "@/components/chat/chat-header";
 import { ConversationItem } from "@/components/chat/conversation-item";
 import { FilterTabs } from "@/components/chat/filter-tabs";
 import { ErrorView } from "@/components/common/error-view";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { IosButton } from "@/components/ui/ios-button";
-import { MOCK_CONVERSATIONS } from "@/constants/chat";
+// import { MOCK_CONVERSATIONS } from "@/constants/chat"; // Removed mock
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import type { Conversation, FilterTab } from "@/types/chat";
+import { useFriends } from "@/hooks/use-friends";
+import type { Friend } from "@/features/friends/api";
+
+// Helper to map Friend to Conversation
+function mapFriendToConversation(friend: Friend): Conversation {
+  return {
+    id: friend.user_id,
+    name: friend.display_name || friend.username || "Unknown",
+    avatarSeed: friend.user_id, // Use user_id as seed
+    avatarUrl: friend.profile_picture || undefined,
+    lastMessage: "Start a conversation",
+    timestamp: new Date(friend.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    unreadCount: 0,
+    isPinned: false,
+    isGroup: false,
+    isOnline: false, // API doesn't return online status yet
+  };
+}
 
 // Hook: Filter conversations based on search and active tab
 function useFilteredConversations(
@@ -39,10 +57,10 @@ function useFilteredConversations(
         filtered = filtered.filter((conv) => conv.unreadCount > 0);
         break;
       case "favourites":
-        filtered = filtered.filter((conv) => conv.isPinned);
+        filtered = filtered.filter((conv) => (conv.isPinned ?? false));
         break;
       case "groups":
-        filtered = filtered.filter((conv) => conv.isGroup);
+        filtered = filtered.filter((conv) => (conv.isGroup ?? false));
         break;
       default:
         break;
@@ -72,7 +90,7 @@ function EmptyState({
       case "groups":
         return "No group chats";
       default:
-        return "No chats yet";
+        return "No friends yet. Add one!"; // Default state
     }
   };
 
@@ -94,14 +112,6 @@ function ListHeader({
   activeTab: FilterTab;
   onTabChange: (tab: FilterTab) => void;
 }) {
-  const _handleArchivedPress = () => {
-    if (Platform.OS !== "web") {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    // TODO: Navigate to archived chats
-    console.log("Open archived chats");
-  };
-
   return <FilterTabs activeTab={activeTab} onTabChange={onTabChange} />;
 }
 
@@ -109,55 +119,36 @@ function ListHeader({
 export default function ChatsScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
+  const router = useRouter();
   const isDark = colorScheme === "dark";
 
   // State
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
+
+  // API Hooks
+  const { data: friends, isLoading, error, refetch } = useFriends();
+
+  // Derived conversations from friends
+  const conversationList: Conversation[] = useMemo(() => {
+    return friends?.map(mapFriendToConversation) ?? [];
+  }, [friends]);
 
   // Derived state
   const bgColor = isDark ? "#000000" : "#FFFFFF";
   const placeholderColor = isDark ? "#636366" : "#8E8E93";
-  const filteredConversations = useFilteredConversations(conversations, searchQuery, activeTab);
-
-  // Fetch conversations (placeholder for future API integration)
-  const refetch = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // TODO: Replace with actual API call
-      // const data = await fetchConversations();
-      // setConversations(data);
-
-      // Simulate API call for now
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setConversations(MOCK_CONVERSATIONS);
-      setIsLoading(false);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error("Failed to load conversations"));
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Load conversations on mount
-  React.useEffect(() => {
-    void refetch();
-  }, [refetch]);
+  const filteredConversations = useFilteredConversations(conversationList, searchQuery, activeTab);
 
   // Handlers
   const handleConversationPress = useCallback((id: string) => {
     if (Platform.OS !== "web") {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    // TODO: Navigate to conversation
-    console.log("Open conversation:", id);
-  }, []);
+    // Navigate to conversation
+    router.push(`/chat/${id}`);
+  }, [router]);
 
   const handleConversationLongPress = useCallback((id: string) => {
-    // TODO: Show conversation options (delete, pin, mute, etc.)
     console.log("Long press conversation:", id);
   }, []);
 
@@ -165,7 +156,6 @@ export default function ChatsScreen() {
     if (Platform.OS !== "web") {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    // TODO: Open camera
     console.log("Open camera");
   }, []);
 
@@ -173,15 +163,13 @@ export default function ChatsScreen() {
     if (Platform.OS !== "web") {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    // TODO: Open new chat screen
-    console.log("New chat");
-  }, []);
+    router.push("/users/search");
+  }, [router]);
 
   const handleMorePress = useCallback(() => {
     if (Platform.OS !== "web") {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    // TODO: Show more options
     console.log("More options");
   }, []);
 
@@ -200,7 +188,7 @@ export default function ChatsScreen() {
   const keyExtractor = useCallback((item: Conversation) => item.id, []);
 
   // Show loading state
-  if (isLoading && conversations.length === 0) {
+  if (isLoading) {
     return (
       <ThemedView style={[styles.container, styles.centerContainer, { backgroundColor: bgColor }]}>
         <ActivityIndicator size="large" color={isDark ? "#FFFFFF" : "#000000"} />
@@ -208,11 +196,11 @@ export default function ChatsScreen() {
     );
   }
 
-  // Show error state (only if no conversations loaded)
-  if (error && conversations.length === 0) {
+  // Show error state
+  if (error && conversationList.length === 0) {
     return (
       <ThemedView style={[styles.container, { backgroundColor: bgColor }]}>
-        <ErrorView error={error} onRetry={refetch} customMessage="ไม่สามารถโหลดรายการแชทได้" />
+        <ErrorView error={error as Error} onRetry={() => refetch()} customMessage="ไม่สามารถโหลดรายชื่อเพื่อนได้" />
       </ThemedView>
     );
   }
@@ -227,8 +215,10 @@ export default function ChatsScreen() {
         onMorePress={handleMorePress}
       />
 
+
+
       {/* Show error banner if there's an error but we have cached data */}
-      {error && conversations.length > 0 && (
+      {error && conversationList.length > 0 && (
         <View
           style={[
             styles.errorBanner,
@@ -239,16 +229,8 @@ export default function ChatsScreen() {
           ]}
         >
           <ThemedText style={[styles.errorBannerText, { color: isDark ? "#FF3B30" : "#FF3B30" }]}>
-            {error instanceof Error && error.message.includes("Network request failed")
-              ? "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้"
-              : "ไม่สามารถโหลดข้อมูลล่าสุดได้"}
+            Can't update list
           </ThemedText>
-          <IosButton
-            title="ลองอีกครั้ง"
-            onPress={refetch}
-            style={{ marginTop: 8 }}
-            variant="outline"
-          />
         </View>
       )}
 
@@ -270,7 +252,7 @@ export default function ChatsScreen() {
         }
         overScrollMode="never"
         refreshing={isLoading}
-        onRefresh={refetch}
+        onRefresh={() => refetch()}
       />
     </ThemedView>
   );
