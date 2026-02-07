@@ -1,4 +1,4 @@
-import { AntDesign, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -46,11 +46,11 @@ export default function EditProfileScreen() {
   const [bio, setBio] = useState("");
   const [selectedAvatarSeed, setSelectedAvatarSeed] = useState(AVATAR_SEEDS[0]);
   const [selectedBackgroundImage, setSelectedBackgroundImage] = useState<string | null>(null);
-  const [originalData, setOriginalData] = useState<ProfileResponse | null>(null);
+  const [_originalData, setOriginalData] = useState<ProfileResponse | null>(null);
 
   const bgColor = isDark ? "#000000" : "#FFFFFF";
   const borderColor = isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)";
-  const placeholderColor = isDark ? "#636366" : "#8E8E93";
+  const _placeholderColor = isDark ? "#636366" : "#8E8E93";
 
   // Fetch profile data
   const { profile, isLoading, error, refetch } = useProfileStore();

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageBackground, KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -12,7 +12,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts } from '@/constants/theme';
 
 const PIN_LENGTH = 6;
-const LOCKOUT_THRESHOLD = 5;
+const _LOCKOUT_THRESHOLD = 5;
 const WARNING_THRESHOLD = 3;
 const LOCKOUT_CLEAR_DELAY = 2000;
 
@@ -21,10 +21,10 @@ const formatLockoutMessage = (seconds: number): string => {
   if (seconds <= 0) {
     return 'คุณใส่รหัส PIN ผิดเกิน 5 ครั้ง กรุณาลองใหม่อีกครั้ง';
   }
-  
+
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  
+
   if (minutes > 0) {
     return `คุณใส่รหัส PIN ผิดเกิน 5 ครั้ง กรุณารออีก ${minutes} นาที ${secs} วินาที`;
   }
@@ -34,36 +34,37 @@ const formatLockoutMessage = (seconds: number): string => {
 export default function PinVerifyScreen() {
   const insets = useSafeAreaInsets();
   const { completePinVerify, state } = useAuth();
+  const requiresPinVerify = state.status === 'signedIn' ? state.requiresPinVerify : false;
 
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
   const [lockoutRemainingSeconds, setLockoutRemainingSeconds] = useState<number | null>(null);
   const [isCheckingLockout, setIsCheckingLockout] = useState(true);
-  
+
   const inputRef = useRef<TextInput>(null);
   const isSubmittingRef = useRef(false);
   const lastPinRef = useRef('');
   const hasCheckedLockoutRef = useRef(false);
-  
+
   const verifyPinMutation = useVerifyPin();
   const mutateAsyncRef = useRef(verifyPinMutation.mutateAsync);
   mutateAsyncRef.current = verifyPinMutation.mutateAsync;
 
   // Check if user is currently locked out
   const isLockedOut = useMemo(
-    () => attemptsRemaining === 0 && 
-          lockoutRemainingSeconds !== null && 
-          lockoutRemainingSeconds > 0,
+    () => attemptsRemaining === 0 &&
+      lockoutRemainingSeconds !== null &&
+      lockoutRemainingSeconds > 0,
     [attemptsRemaining, lockoutRemainingSeconds]
   );
 
   // Check if input should be disabled
   const isInputDisabled = useMemo(
-    () => isCheckingLockout || 
-          isLockedOut || 
-          verifyPinMutation.isPending || 
-          isSubmittingRef.current,
+    () => isCheckingLockout ||
+      isLockedOut ||
+      verifyPinMutation.isPending ||
+      isSubmittingRef.current,
     [isCheckingLockout, isLockedOut, verifyPinMutation.isPending]
   );
 
@@ -73,7 +74,7 @@ export default function PinVerifyScreen() {
       return;
     }
 
-    if (state.status !== 'signedIn' || !state.requiresPinVerify) {
+    if (state.status !== 'signedIn' || !requiresPinVerify) {
       setIsCheckingLockout(false);
       hasCheckedLockoutRef.current = true;
       return;
@@ -84,14 +85,14 @@ export default function PinVerifyScreen() {
 
       try {
         const res = await mutateAsyncRef.current('000000');
-        
+
         // Check if user has a PIN
         if (res.has_pin === false) {
           // User doesn't have a PIN, skip verification
           await completePinVerifyRef.current();
           return;
         }
-        
+
         if (res.attempts_remaining === 0 && res.lockout_remaining_seconds) {
           setAttemptsRemaining(0);
           setLockoutRemainingSeconds(res.lockout_remaining_seconds);
@@ -103,17 +104,17 @@ export default function PinVerifyScreen() {
         if (__DEV__) {
           console.log('[PinVerify] Error checking lockout status:', e);
         }
-        
+
         // If there's an error checking PIN, check if it's because user doesn't have a PIN
         // This might need to be adjusted based on actual API error responses
         try {
-          const errorBody = (e as any)?.body;
+          const errorBody = e instanceof HttpError ? (e.body as { error_code?: string }) : undefined;
           if (errorBody?.error_code === 'NO_PIN_SET') {
             // User doesn't have a PIN, skip verification
             await completePinVerifyRef.current();
             return;
           }
-        } catch (parseError) {
+        } catch (_parseError) {
           // Ignore parsing errors
         }
       } finally {
@@ -122,7 +123,7 @@ export default function PinVerifyScreen() {
     };
 
     void checkLockoutStatus();
-  }, [state.status, state.status === 'signedIn' && state.requiresPinVerify]);
+  }, [state.status, requiresPinVerify]);
 
   // Submit PIN verification
   const completePinVerifyRef = useRef(completePinVerify);
@@ -132,7 +133,7 @@ export default function PinVerifyScreen() {
     // Prevent submission if conditions aren't met
     const currentState = state;
     const currentIsLockedOut = isLockedOut;
-    
+
     if (
       (currentState.status === 'signedIn' && !currentState.requiresPinVerify) ||
       currentIsLockedOut ||
@@ -153,10 +154,10 @@ export default function PinVerifyScreen() {
     isSubmittingRef.current = true;
     lastPinRef.current = pinToVerify;
     setError(null);
-    
+
     try {
       const res = await mutateAsyncRef.current(pinToVerify);
-      
+
       if (res.verified) {
         if (__DEV__) {
           console.log('[PinVerify] PIN verified successfully');
@@ -168,12 +169,12 @@ export default function PinVerifyScreen() {
         if (__DEV__) {
           console.log('[PinVerify] PIN verification failed');
         }
-        
+
         setPin('');
         lastPinRef.current = '';
         setAttemptsRemaining(res.attempts_remaining ?? null);
         setLockoutRemainingSeconds(res.lockout_remaining_seconds ?? null);
-        
+
         if (res.attempts_remaining === 0) {
           setError('คุณใส่รหัส PIN ผิดเกิน 5 ครั้ง');
         } else {
@@ -189,11 +190,11 @@ export default function PinVerifyScreen() {
       if (__DEV__) {
         console.log('[PinVerify] PIN verification error:', e);
       }
-      
+
       setPin('');
       lastPinRef.current = '';
       isSubmittingRef.current = false;
-      
+
       if (e instanceof HttpError) {
         const body = e.body as { error?: string };
         setError(body?.error ?? 'ยืนยัน PIN ไม่สำเร็จ');
@@ -204,8 +205,7 @@ export default function PinVerifyScreen() {
   }, [
     verifyPinMutation.isPending,
     isLockedOut,
-    state.status,
-    state.status === 'signedIn' ? state.requiresPinVerify : false,
+    state,
   ]);
 
   // Countdown timer for lockout
@@ -231,13 +231,13 @@ export default function PinVerifyScreen() {
     if (attemptsRemaining === 0 && lockoutRemainingSeconds !== null) {
       if (lockoutRemainingSeconds <= 0) {
         setError(formatLockoutMessage(0));
-        
+
         const timeout = setTimeout(() => {
           setLockoutRemainingSeconds(null);
           setAttemptsRemaining(null);
           setError(null);
         }, LOCKOUT_CLEAR_DELAY);
-        
+
         return () => clearTimeout(timeout);
       } else {
         setError(formatLockoutMessage(lockoutRemainingSeconds));
@@ -250,8 +250,7 @@ export default function PinVerifyScreen() {
   onSubmitRef.current = onSubmit;
 
   useEffect(() => {
-    const requiresPinVerify = state.status === 'signedIn' ? state.requiresPinVerify : false;
-    
+
     if (
       isInputDisabled ||
       (state.status === 'signedIn' && !requiresPinVerify) ||
@@ -264,20 +263,20 @@ export default function PinVerifyScreen() {
     if (__DEV__) {
       console.log('[PinVerify] Auto-submitting PIN...');
     }
-    
+
     void onSubmitRef.current(pin);
-  }, [pin, isInputDisabled, state.status, state.status === 'signedIn' ? state.requiresPinVerify : false]);
+  }, [pin, isInputDisabled, state.status, requiresPinVerify]);
 
   // Handle digit press
   const handleDigitPress = useCallback((digit: string) => {
     if (isInputDisabled || pin.length >= PIN_LENGTH) {
       return;
     }
-    
+
     if (pin.length === 0) {
       lastPinRef.current = '';
     }
-    
+
     setPin((prev) => prev + digit);
   }, [pin.length, isInputDisabled]);
 
@@ -286,7 +285,7 @@ export default function PinVerifyScreen() {
     if (isInputDisabled) {
       return;
     }
-    
+
     setPin((prev) => {
       const newPin = prev.slice(0, -1);
       if (newPin.length === 0) {
@@ -297,9 +296,9 @@ export default function PinVerifyScreen() {
   }, [isInputDisabled]);
 
   // Show warning for low attempts
-  const showWarning = attemptsRemaining !== null && 
-                      attemptsRemaining > 0 && 
-                      attemptsRemaining <= WARNING_THRESHOLD;
+  const showWarning = attemptsRemaining !== null &&
+    attemptsRemaining > 0 &&
+    attemptsRemaining <= WARNING_THRESHOLD;
 
   return (
     <ImageBackground
@@ -311,9 +310,9 @@ export default function PinVerifyScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <View style={[styles.body, { 
-          paddingTop: insets.top + 16, 
-          paddingBottom: insets.bottom + 16 
+        <View style={[styles.body, {
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 16
         }]}>
           {/* Header with icon */}
           <View style={styles.header}>
@@ -355,7 +354,7 @@ export default function PinVerifyScreen() {
                 onBackspacePress={handleBackspace}
               />
             </View>
-            
+
             {/* Footer text */}
             <View style={styles.footer}>
               <ThemedText style={styles.footerText}>

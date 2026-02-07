@@ -1,5 +1,7 @@
 import type { Conversation, FilterTab } from "@/types/chat";
 
+export const DEFAULT_DEVICE_ID = 1;
+
 // Filter tab labels
 export const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: "all", label: "All" },

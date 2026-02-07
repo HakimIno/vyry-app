@@ -8,11 +8,12 @@ import React, {
   useState,
 } from "react";
 import { AppState, type AppStateStatus } from "react-native";
-import { queryClient } from "@/app/_layout";
+import { queryClient } from "@/lib/react-query";
 import { clearAuthenticationFailureHandler, setAuthenticationFailureHandler } from "@/lib/http";
 import { SecureKV } from "@/lib/secure-store";
 import { uuidv4 } from "@/lib/uuid";
 import { useProfileStore } from "@/stores/profile-store";
+import { SignalService } from "@/services/signal";
 
 import type { VerifyOtpResponse } from "./auth-types";
 import { useCheckPinStatus, useSkipPinSetup } from "./auth-hooks";
@@ -21,14 +22,14 @@ type AuthState =
   | { status: "loading" }
   | { status: "signedOut" }
   | {
-      status: "signedIn";
-      accessToken: string;
-      refreshToken: string;
-      requiresProfileSetup: boolean;
-      requiresPinSetup: boolean;
-      requiresPinVerify: boolean;
-      hasPin: boolean;
-    };
+    status: "signedIn";
+    accessToken: string;
+    refreshToken: string;
+    requiresProfileSetup: boolean;
+    requiresPinSetup: boolean;
+    requiresPinVerify: boolean;
+    hasPin: boolean;
+  };
 
 type AuthContextValue = {
   state: AuthState;
@@ -67,8 +68,9 @@ const isSignedIn = (state: AuthState): state is Extract<AuthState, { status: "si
 };
 
 // Auth data management
-class AuthStorage {
-  static async getAll() {
+// Auth data management
+const AuthStorage = {
+  async getAll() {
     const [
       accessToken,
       refreshToken,
@@ -96,9 +98,9 @@ class AuthStorage {
       requiresPinVerify: parseBool(requiresPinVerify),
       hasPin: parseBool(hasPin),
     };
-  }
+  },
 
-  static async setSession(data: {
+  async setSession(data: {
     accessToken: string;
     refreshToken: string;
     requiresProfileSetup: boolean;
@@ -114,9 +116,9 @@ class AuthStorage {
       SecureKV.set(AUTH_KEYS.REQUIRES_PIN_VERIFY, String(data.requiresPinVerify)),
       SecureKV.set(AUTH_KEYS.HAS_PIN, String(data.hasPin ?? true)),
     ]);
-  }
+  },
 
-  static async updateFlags(
+  async updateFlags(
     updates: Partial<{
       requiresProfileSetup: boolean;
       requiresPinSetup: boolean;
@@ -142,9 +144,9 @@ class AuthStorage {
     }
 
     await Promise.all(promises);
-  }
+  },
 
-  static async clearSession() {
+  async clearSession() {
     await Promise.all([
       SecureKV.del(AUTH_KEYS.ACCESS_TOKEN),
       SecureKV.del(AUTH_KEYS.REFRESH_TOKEN),
@@ -153,17 +155,17 @@ class AuthStorage {
       SecureKV.del(AUTH_KEYS.REQUIRES_PIN_VERIFY),
       SecureKV.del(AUTH_KEYS.HAS_PIN),
     ]);
-  }
+  },
 
-  static async ensureDeviceUuid(): Promise<string> {
+  async ensureDeviceUuid(): Promise<string> {
     let uuid = await SecureKV.get(AUTH_KEYS.DEVICE_UUID);
     if (!uuid) {
       uuid = uuidv4();
       await SecureKV.set(AUTH_KEYS.DEVICE_UUID, uuid);
     }
     return uuid;
-  }
-}
+  },
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: "loading" });
@@ -176,6 +178,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Update snapshot whenever state changes
   useEffect(() => {
     stateSnapshotRef.current = state;
+
+    if (state.status === "signedIn") {
+      SignalService.getInstance()
+        .ensureKeys()
+        .catch((e) => {
+          console.error("[Auth] Failed to ensure Signal keys:", e);
+        });
+    }
   }, [state]);
 
   const bootstrap = useCallback(async () => {
@@ -209,7 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Check PIN status from API
         try {
           const pinStatus = await checkPinStatusMutation.mutateAsync();
-          
+
           setState((current) => {
             // Never override verified state
             if (shouldPreserveState(current)) {
@@ -221,10 +231,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             // Initial bootstrap or signed out
             if (current.status === "loading" || current.status === "signedOut") {
+              // Ensure we have tokens before setting status to signedIn
+              if (!stored.accessToken || !stored.refreshToken) {
+                return { status: "signedOut" };
+              }
+
               return {
                 status: "signedIn",
-                accessToken: stored.accessToken!,
-                refreshToken: stored.refreshToken!,
+                accessToken: stored.accessToken,
+                refreshToken: stored.refreshToken,
                 requiresProfileSetup: stored.requiresProfileSetup,
                 requiresPinSetup: stored.requiresPinSetup,
                 requiresPinVerify: pinStatus.has_pin ? stored.requiresPinVerify : false,
@@ -236,8 +251,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (isSignedIn(current) && current.accessToken !== stored.accessToken) {
               return {
                 ...current,
-                accessToken: stored.accessToken!,
-                refreshToken: stored.refreshToken!,
+                accessToken: stored.accessToken ?? current.accessToken,
+                refreshToken: stored.refreshToken ?? current.refreshToken,
                 requiresProfileSetup: stored.requiresProfileSetup,
                 requiresPinSetup: stored.requiresPinSetup,
                 requiresPinVerify: pinStatus.has_pin ? stored.requiresPinVerify : false,
@@ -263,10 +278,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             // Initial bootstrap or signed out
             if (current.status === "loading" || current.status === "signedOut") {
+              if (!stored.accessToken || !stored.refreshToken) {
+                return { status: "signedOut" };
+              }
+
               return {
                 status: "signedIn",
-                accessToken: stored.accessToken!,
-                refreshToken: stored.refreshToken!,
+                accessToken: stored.accessToken,
+                refreshToken: stored.refreshToken,
                 requiresProfileSetup: stored.requiresProfileSetup,
                 requiresPinSetup: stored.requiresPinSetup,
                 requiresPinVerify: false, // Default to false when we can't verify
@@ -278,8 +297,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (isSignedIn(current) && current.accessToken !== stored.accessToken) {
               return {
                 ...current,
-                accessToken: stored.accessToken!,
-                refreshToken: stored.refreshToken!,
+                accessToken: stored.accessToken ?? current.accessToken,
+                refreshToken: stored.refreshToken ?? current.refreshToken,
                 requiresProfileSetup: stored.requiresProfileSetup,
                 requiresPinSetup: stored.requiresPinSetup,
                 requiresPinVerify: false, // Default to false when we can't verify
@@ -299,7 +318,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setState({ status: "signedOut" });
     }
-  }, []);
+  }, [checkPinStatusMutation]);
 
   // Bootstrap on mount
   useEffect(() => {
@@ -322,6 +341,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       status: "signedIn",
       ...sessionData,
     });
+
   }, []);
 
   const completeProfileSetup = useCallback(async () => {
@@ -350,7 +370,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Call API to skip PIN setup
       await skipPinSetupMutation.mutateAsync();
-      
+
       // Update local state
       await AuthStorage.updateFlags({
         requiresPinSetup: false,
@@ -415,7 +435,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log("[Auth] App backgrounding, will check PIN status on foreground");
         }
       }
-      
+
       // When app comes to foreground, check if user has a PIN
       if (isForegrounding) {
         const currentState = stateSnapshotRef.current;
@@ -459,7 +479,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => subscription.remove();
-  }, []);
+  }, [checkPinStatusMutation]);
 
   // Handle authentication failures
   useEffect(() => {

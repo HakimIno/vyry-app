@@ -4,7 +4,6 @@ import { Dimensions, Platform, StyleSheet, TextInput, View } from "react-native"
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSequence,
   withSpring,
   withTiming,
@@ -48,7 +47,7 @@ export function OtpInput({
       if (Platform.OS !== "web") {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-      
+
       shakeAnim.value = withSequence(
         withTiming(-10, ANIMATION_CONFIG.TIMING_SHAKE),
         withTiming(10, ANIMATION_CONFIG.TIMING_SHAKE),
@@ -64,12 +63,12 @@ export function OtpInput({
   // Optimized change handler with useCallback
   const handleChange = useCallback((text: string) => {
     const cleanText = text.replace(/\D/g, "").slice(0, length);
-    
+
     // Provide haptic feedback when adding digits (not removing)
     if (cleanText.length > value.length && Platform.OS !== "web") {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    
+
     onChange(cleanText);
   }, [length, onChange, value.length]);
 
@@ -80,13 +79,14 @@ export function OtpInput({
 
   return (
     <View style={styles.container}>
-      <Animated.View 
-        style={[styles.inputContainer, containerAnimatedStyle]} 
+      <Animated.View
+        style={[styles.inputContainer, containerAnimatedStyle]}
         pointerEvents="none"
       >
         {Array.from({ length }, (_, i) => (
           <OtpDigitBox
-            key={i}
+            // biome-ignore lint/suspicious/noArrayIndexKey: order is fixed
+            key={`otp-${i}`}
             index={i}
             digit={digits[i]}
             isActive={i === value.length && isFocused}

@@ -45,7 +45,7 @@ export const CountryPickerSheet = forwardRef<CountryPickerSheetRef, CountryPicke
     });
 
     // Memoize sections and filtered sections together to avoid duplicate calculations
-    const { sections, displaySections } = useMemo(() => {
+    const displaySections = useMemo(() => {
       // Group countries by first letter
       const groupedCountries = countries.reduce(
         (acc, country) => {
@@ -68,20 +68,18 @@ export const CountryPickerSheet = forwardRef<CountryPickerSheetRef, CountryPicke
         }));
 
       // Apply search filter if needed
-      const displaySections = searchQuery.trim()
+      return searchQuery.trim()
         ? sections
-            .map((section) => ({
-              ...section,
-              data: section.data.filter(
-                (country) =>
-                  country.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  country.code.toLowerCase().includes(searchQuery.toLowerCase())
-              ),
-            }))
-            .filter((section) => section.data.length > 0)
+          .map((section) => ({
+            ...section,
+            data: section.data.filter(
+              (country) =>
+                country.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                country.code.toLowerCase().includes(searchQuery.toLowerCase())
+            ),
+          }))
+          .filter((section) => section.data.length > 0)
         : sections;
-
-      return { sections, displaySections };
     }, [countries, searchQuery]);
 
     useImperativeHandle(ref, () => ({

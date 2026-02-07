@@ -47,8 +47,16 @@ const getCountryFlagEmoji = (countryCode: string): string => {
   }
 };
 
+interface ApiCountry {
+  alpha2Code?: string;
+  code?: string;
+  callingCodes?: string[];
+  dial_code?: string;
+  name: string;
+}
+
 // Extract and clean country data
-const extractCountryData = (apiCountry: any): Country | null => {
+const extractCountryData = (apiCountry: ApiCountry): Country | null => {
   const code = apiCountry.alpha2Code || apiCountry.code;
   const dialCode = apiCountry.callingCodes?.[0] || apiCountry.dial_code;
   const name = apiCountry.name;

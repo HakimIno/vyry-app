@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from "expo-router";
-import React from "react";
+
 import {
     ActivityIndicator,
     StyleSheet,

@@ -1,3 +1,4 @@
+import "@/lib/polyfills";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Redirect, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -9,6 +10,7 @@ import { useFonts } from "expo-font";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "@/features/auth/auth-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { wsService } from "@/services/websocket";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -17,7 +19,9 @@ export const unstable_settings = {
 // Prevent splash from auto-hiding until we're ready
 SplashScreen.preventAutoHideAsync();
 
-export const queryClient = new QueryClient();
+import { queryClient } from "@/lib/react-query";
+export { queryClient };
+
 
 /**
  * Declarative auth guard - returns Redirect component or children
@@ -25,8 +29,21 @@ export const queryClient = new QueryClient();
  */
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
-  const segments = useSegments();
+  // Handle WebSocket connection
+  useEffect(() => {
+    if (state.status === "signedIn") {
+      wsService.connect();
+    } else {
+      wsService.disconnect();
+    }
 
+    return () => {
+      // Optional: disconnect on unmount, but mostly we want it to persist while app is open
+      // unless signed out. AuthGuard unmounting usually means nav change, but we are at root.
+    };
+  }, [state.status]);
+
+  const segments = useSegments();
   const inAuthGroup = segments[0] === "(auth)";
   const currentRoute = segments[segments.length - 1] || segments[0];
 
@@ -72,6 +89,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
     return <Redirect href="/(tabs)" />;
   }
+
+
 
   return <>{children}</>;
 }

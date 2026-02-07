@@ -23,7 +23,7 @@ import { IosButton } from "@/components/ui/ios-button";
 import { IosTextField } from "@/components/ui/ios-text-field";
 import { setupProfile } from "@/features/auth/auth-api";
 import { useAuth } from "@/features/auth/auth-context";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+
 import { HttpError } from "@/lib/http";
 import { Fonts } from "@/constants/theme";
 
@@ -39,7 +39,7 @@ const EDIT_BADGE_RADIUS = EDIT_BADGE_SIZE / 2;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { signOut, completeProfileSetup } = useAuth();
+  const { completeProfileSetup } = useAuth();
   const avatarPickerRef = useRef<AvatarPickerSheetRef>(null);
 
   const [name, setName] = useState("");
@@ -54,10 +54,10 @@ export default function ProfileScreen() {
   // Handle profile submission
   const handleProfileSubmit = useCallback(async () => {
     if (!canSubmit) return;
-    
+
     setError(null);
     setLoading(true);
-    
+
     try {
       await setupProfile({
         displayName: name.trim(),

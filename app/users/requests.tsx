@@ -1,6 +1,6 @@
-import { Ionicons } from "@expo/vector-icons";
+
 import { Stack, useRouter } from "expo-router";
-import React, { useCallback } from "react";
+import { useCallback } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -44,7 +44,7 @@ export default function FriendRequestsScreen() {
                     );
                     refetch(); // Refresh list
                 },
-                onError: (err) => {
+                onError: (_err) => {
                     Alert.alert("Error", "Failed to process request");
                 }
             }

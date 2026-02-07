@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ImageBackground, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
@@ -19,18 +19,18 @@ export default function OtpScreen() {
   const { phone } = useLocalSearchParams<{ phone: string }>();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const _isDark = colorScheme === "dark";
   const { setSessionFromVerifyOtp, deviceUuid } = useAuth();
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(RESEND_COOLDOWN);
-  const [resending, setResending] = useState(false);
+  const [_resending, setResending] = useState(false);
 
   const canSubmit = useMemo(() => otp.length === OTP_LENGTH && !loading, [otp, loading]);
 
-  const handleVerify = async () => {
+  const handleVerify = useCallback(async () => {
     if (!phone || otp.length !== OTP_LENGTH) return;
     setError(null);
     setLoading(true);
@@ -55,7 +55,7 @@ export default function OtpScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [phone, otp, deviceUuid, setSessionFromVerifyOtp]);
 
   // Auto-submit when OTP is complete
   useEffect(() => {
@@ -136,8 +136,8 @@ export default function OtpScreen() {
                 </ThemedText>
               ) : (
                 <Pressable onPress={() => void handleResend()} disabled={countdown > 0}>
-                  <ThemedText style={[styles.resendText, { 
-                    color:  "#6EE28B",
+                  <ThemedText style={[styles.resendText, {
+                    color: "#6EE28B",
                     textDecorationLine: countdown > 0 ? "none" : "underline",
                     fontFamily: Fonts.bold,
                     fontSize: 12
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   phoneNumber: {
-    fontSize: 11, 
+    fontSize: 11,
     color: "#6EE28B",
     textAlign: "center",
     fontFamily: Fonts.regular,

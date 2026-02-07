@@ -27,7 +27,7 @@ export default function SearchUserScreen() {
     const [debouncedQuery, setDebouncedQuery] = useState("");
 
     // Search Hook
-    const { data: user, isLoading, error, refetch } = useSearchUsers(debouncedQuery);
+    const { data: user, isLoading, error } = useSearchUsers(debouncedQuery);
     const addFriendMutation = useAddFriend();
 
     // Debounce search

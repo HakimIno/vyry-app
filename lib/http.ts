@@ -212,8 +212,20 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const parsed = await parseJsonOrText(res);
-    const msg = typeof parsed === "string" ? parsed : "Request failed";
-    throw new HttpError(res.status, msg, parsed);
+    const msg =
+      typeof parsed === "object" && parsed !== null && "message" in parsed
+        ? (parsed as { message: string }).message
+        : typeof parsed === "string"
+          ? parsed
+          : "Request failed";
+
+    const errorBody = typeof parsed === "object" ? parsed : { error: msg };
+
+    if (__DEV__) {
+      console.error(`[HTTP] Error ${res.status}:`, errorBody);
+    }
+
+    throw new HttpError(res.status, msg, errorBody);
   }
 
   return (await res.json()) as T;

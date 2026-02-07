@@ -51,9 +51,9 @@ function _HeaderButton({
 export function ChatHeader({
   searchQuery,
   onSearchChange,
-  onCameraPress,
+  onCameraPress: _onCameraPress,
   onNewChatPress,
-  onMorePress,
+  onMorePress: _onMorePress,
 }: ChatHeaderProps) {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();

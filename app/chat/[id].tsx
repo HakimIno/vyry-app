@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { FlashList } from "@shopify/flash-list";
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
     KeyboardAvoidingView,
     Platform,
@@ -9,6 +9,7 @@ import {
     TextInput,
     View,
     TouchableOpacity,
+    ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
@@ -17,50 +18,35 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { getAvatarUrl } from "@/components/ui/avatar-picker-sheet";
-import { WHATSAPP_GREEN } from "@/constants/chat";
-
-// Mock messages for now
-const MOCK_MESSAGES = [
-    { id: "1", text: "Hello!", sender: "them", time: "10:00 AM" },
-    { id: "2", text: "Hi there! How are you?", sender: "me", time: "10:05 AM" },
-    { id: "3", text: "I'm doing great, thanks for asking.", sender: "them", time: "10:06 AM" },
-];
-
-type Message = typeof MOCK_MESSAGES[0];
+import { WHATSAPP_GREEN, DEFAULT_DEVICE_ID } from "@/constants/chat";
+import { useChat, ChatMessage } from "@/hooks/use-chat";
 
 export default function ChatScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const router = useRouter();
+    const _router = useRouter();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === "dark";
-    const [messages, setMessages] = useState(MOCK_MESSAGES);
+
+    // Use the real chat hook
+    const { messages, sendMessage, loading } = useChat(id, DEFAULT_DEVICE_ID);
+
     const [inputText, setInputText] = useState("");
+    // biome-ignore lint/suspicious/noExplicitAny: FlashList type definition is treated as a value
     const flatListRef = useRef<any>(null);
 
-    // Scroll to bottom on load
+    // Scroll to bottom on new messages
     useEffect(() => {
-        setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: false });
-        }, 100);
-    }, []);
+        if (messages.length > 0) {
+            setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+        }
+    }, [messages]);
 
     const handleSend = () => {
         if (!inputText.trim()) return;
-
-        const newMessage = {
-            id: Date.now().toString(),
-            text: inputText.trim(),
-            sender: "me",
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-
-        setMessages((prev) => [...prev, newMessage]);
+        sendMessage(inputText.trim());
         setInputText("");
-
-        // Scroll to bottom
-        setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
     };
 
     const bgColor = isDark ? "#000000" : "#F2F2F7"; // WhatsApp-like background
@@ -87,7 +73,7 @@ export default function ChatScreen() {
                             />
                             <View>
                                 <ThemedText style={styles.headerName}>Friend {id?.slice(0, 4)}</ThemedText>
-                                <ThemedText style={styles.headerStatus}>Online</ThemedText>
+                                <ThemedText style={styles.headerStatus}>Online (Signal E2EE)</ThemedText>
                             </View>
                         </View>
                     ),
@@ -99,34 +85,40 @@ export default function ChatScreen() {
                 }}
             />
 
-            <FlashList<Message>
-                ref={flatListRef}
-                data={messages}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.messageList}
-                renderItem={({ item }) => (
-                    <View
-                        style={[
-                            styles.messageBubble,
-                            item.sender === "me"
-                                ? [styles.messageBubbleMe, { backgroundColor: bubbleMe }]
-                                : [styles.messageBubbleThem, { backgroundColor: bubbleThem }],
-                        ]}
-                    >
-                        <ThemedText
-                            style={{
-                                color: item.sender === "me" ? textMe : textThem,
-                                fontSize: 16,
-                            }}
+            {loading ? (
+                <View style={[styles.centerContainer, { backgroundColor: bgColor }]}>
+                    <ActivityIndicator size="large" color={textColor} />
+                </View>
+            ) : (
+                <FlashList<ChatMessage>
+                    ref={flatListRef}
+                    data={messages}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={styles.messageList}
+                    renderItem={({ item }) => (
+                        <View
+                            style={[
+                                styles.messageBubble,
+                                item.sender === "me"
+                                    ? [styles.messageBubbleMe, { backgroundColor: bubbleMe }]
+                                    : [styles.messageBubbleThem, { backgroundColor: bubbleThem }],
+                            ]}
                         >
-                            {item.text}
-                        </ThemedText>
-                        <ThemedText style={[styles.messageTime, { color: item.sender === "me" ? "rgba(255,255,255,0.7)" : "#8E8E93" }]}>
-                            {item.time}
-                        </ThemedText>
-                    </View>
-                )}
-            />
+                            <ThemedText
+                                style={{
+                                    color: item.sender === "me" ? textMe : textThem,
+                                    fontSize: 16,
+                                }}
+                            >
+                                {item.text}
+                            </ThemedText>
+                            <ThemedText style={[styles.messageTime, { color: item.sender === "me" ? "rgba(255,255,255,0.7)" : "#8E8E93" }]}>
+                                {item.time}
+                            </ThemedText>
+                        </View>
+                    )}
+                />
+            )}
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -241,6 +233,11 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    centerContainer: {
+        flex: 1,
         alignItems: "center",
         justifyContent: "center",
     },

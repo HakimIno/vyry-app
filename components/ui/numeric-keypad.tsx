@@ -29,8 +29,8 @@ export function NumericKeypad({ onDigitPress, onBackspacePress }: NumericKeypadP
   return (
     <View style={styles.container}>
       {/* Number rows */}
-      {digits.map((row, rowIndex) => (
-        <View key={rowIndex} style={styles.row}>
+      {digits.map((row) => (
+        <View key={`row-${row.join('')}`} style={styles.row}>
           {row.map((digit) => (
             <KeypadButton
               key={digit}

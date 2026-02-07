@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageBackground, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -19,7 +19,7 @@ type Step = 'create' | 'confirm';
 export default function PinSetupScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const _isDark = colorScheme === 'dark';
   const { completePinSetup, skipPinSetup } = useAuth();
 
   const [step, setStep] = useState<Step>('create');
@@ -27,7 +27,7 @@ export default function PinSetupScreen() {
   const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
-  
+
   const setupPinMutation = useSetupPin();
 
   // Auto-advance when PIN is complete
@@ -40,13 +40,6 @@ export default function PinSetupScreen() {
     }
   }, [pin, step]);
 
-  // Auto-submit when confirm PIN is complete
-  useEffect(() => {
-    if (step === 'confirm' && confirmPin.length === PIN_LENGTH && !setupPinMutation.isPending) {
-      void onSubmit();
-    }
-  }, [confirmPin, step, setupPinMutation.isPending]);
-
   const completePinSetupRef = useRef(completePinSetup);
   completePinSetupRef.current = completePinSetup;
 
@@ -55,7 +48,7 @@ export default function PinSetupScreen() {
       // Mark PIN setup as skipped
       await skipPinSetup();
       // Navigation is handled by AuthGuard after state update
-    } catch (e) {
+    } catch (_e) {
       setError('ข้ามขั้นตอนไม่สำเร็จ');
     }
   }, [skipPinSetup]);
@@ -86,6 +79,13 @@ export default function PinSetupScreen() {
       }
     }
   }, [pin, confirmPin, setupPinMutation]);
+
+  // Auto-submit when confirm PIN is complete
+  useEffect(() => {
+    if (step === 'confirm' && confirmPin.length === PIN_LENGTH && !setupPinMutation.isPending) {
+      void onSubmit();
+    }
+  }, [confirmPin, step, setupPinMutation.isPending, onSubmit]);
 
   const handleDigitPress = useCallback((digit: string) => {
     if (step === 'create') {
@@ -175,13 +175,13 @@ export default function PinSetupScreen() {
                 onBackspacePress={handleBackspace}
               />
             </View>
-            
+
             {/* Footer text and skip button */}
             <View style={styles.footer}>
               <ThemedText style={[styles.footerText, { color: '#FFFFFF' }]}>
                 {subtitle}
               </ThemedText>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.skipButton}
                 onPress={handleSkipPinSetup}
                 activeOpacity={0.7}

@@ -6,15 +6,25 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "cache": {
+        "key": "dev-cache",
+        "cacheDefaultPaths": true,
+        "customPaths": ["node_modules", "android/.gradle"]
+      },
+      "resourceClass": "large",
       "ios": {
         "simulator": true
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
       }
     },
     "preview": {
       "distribution": "internal",
+      "cache": {
+        "key": "preview-cache"
+      },
       "ios": {
         "simulator": false
       },
@@ -23,6 +33,9 @@
       }
     },
     "production": {
+      "cache": {
+        "key": "prod-cache"
+      },
       "ios": {
         "simulator": false
       },

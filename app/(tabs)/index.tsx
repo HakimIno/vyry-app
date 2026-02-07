@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { FlashList } from "@shopify/flash-list";
 import * as Haptics from "expo-haptics";
-import React, { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -14,24 +14,7 @@ import { ThemedView } from "@/components/themed-view";
 // import { MOCK_CONVERSATIONS } from "@/constants/chat"; // Removed mock
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import type { Conversation, FilterTab } from "@/types/chat";
-import { useFriends } from "@/hooks/use-friends";
-import type { Friend } from "@/features/friends/api";
-
-// Helper to map Friend to Conversation
-function mapFriendToConversation(friend: Friend): Conversation {
-  return {
-    id: friend.user_id,
-    name: friend.display_name || friend.username || "Unknown",
-    avatarSeed: friend.user_id, // Use user_id as seed
-    avatarUrl: friend.profile_picture || undefined,
-    lastMessage: "Start a conversation",
-    timestamp: new Date(friend.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    unreadCount: 0,
-    isPinned: false,
-    isGroup: false,
-    isOnline: false, // API doesn't return online status yet
-  };
-}
+import { useConversations } from "@/hooks/use-conversations";
 
 // Hook: Filter conversations based on search and active tab
 function useFilteredConversations(
@@ -127,12 +110,7 @@ export default function ChatsScreen() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
   // API Hooks
-  const { data: friends, isLoading, error, refetch } = useFriends();
-
-  // Derived conversations from friends
-  const conversationList: Conversation[] = useMemo(() => {
-    return friends?.map(mapFriendToConversation) ?? [];
-  }, [friends]);
+  const { conversations: conversationList, isLoading, error, refetch } = useConversations();
 
   // Derived state
   const bgColor = isDark ? "#000000" : "#FFFFFF";

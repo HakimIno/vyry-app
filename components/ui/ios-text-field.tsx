@@ -41,13 +41,13 @@ export function IosTextField({
     opacity: borderScale.value,
   }));
 
-  const handleFocus = (e: any) => {
+  const handleFocus: NonNullable<TextInputProps["onFocus"]> = (e) => {
     setIsFocused(true);
     borderScale.value = withSpring(1, { damping: 15, stiffness: 300 });
     props.onFocus?.(e);
   };
 
-  const handleBlur = (e: any) => {
+  const handleBlur: NonNullable<TextInputProps["onBlur"]> = (e) => {
     setIsFocused(false);
     borderScale.value = withSpring(0, { damping: 15, stiffness: 300 });
     props.onBlur?.(e);

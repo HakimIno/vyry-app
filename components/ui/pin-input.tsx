@@ -85,7 +85,8 @@ export function PinInput({
 
         return (
           <PinDot
-            key={i}
+            // biome-ignore lint/suspicious/noArrayIndexKey: order is fixed
+            key={`pin-${i}`}
             isFilled={isFilled}
             isActive={isActive}
             error={error}
@@ -129,9 +130,9 @@ const PinDot = React.memo(
     isFilled,
     isActive,
     error,
-    isDark,
-    secure,
-    digit,
+    isDark: _isDark,
+    secure: _secure,
+    digit: _digit,
     large = false,
   }: {
     isFilled: boolean;
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',    
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },

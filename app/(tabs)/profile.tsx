@@ -1,8 +1,8 @@
-import { AntDesign, FontAwesome6, Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { FontAwesome6, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,7 +19,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { AVATAR_SEEDS, getAvatarUrl } from "@/components/ui/avatar-picker-sheet";
 import { IosButton } from "@/components/ui/ios-button";
-import { IosTextField } from "@/components/ui/ios-text-field";
+
 import { useAuth } from "@/features/auth/auth-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useProfileStore } from "@/stores/profile-store";
@@ -29,7 +29,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const _isDark = colorScheme === "dark";
   const { signOut } = useAuth();
   const [selectedAvatarSeed, setSelectedAvatarSeed] = useState(AVATAR_SEEDS[0]);
   const [selectedBackgroundImage, setSelectedBackgroundImage] = useState<string | null>(null);

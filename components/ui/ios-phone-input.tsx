@@ -63,13 +63,13 @@ export function IosPhoneInput({
     opacity: borderScale.value,
   }));
 
-  const handleFocus = (e: any) => {
+  const handleFocus = (e: unknown) => {
     setIsFocused(true);
     borderScale.value = withSpring(1, { damping: 15, stiffness: 300 });
     props.onFocus?.(e);
   };
 
-  const handleBlur = (e: any) => {
+  const handleBlur = (e: unknown) => {
     setIsFocused(false);
     borderScale.value = withSpring(0, { damping: 15, stiffness: 300 });
     props.onBlur?.(e);
