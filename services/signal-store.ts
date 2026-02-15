@@ -177,5 +177,9 @@ export class MMKVSignalProtocolStore implements StorageType {
     async putLocalRegistrationId(registrationId: number): Promise<void> {
         storage.set('registrationId', registrationId);
     }
+
+    async clearStore(): Promise<void> {
+        storage.clearAll();
+    }
 }
 

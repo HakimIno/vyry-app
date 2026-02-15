@@ -1,6 +1,6 @@
 // Chat-related type definitions
 
-export type MessageStatus = "sending" | "sent" | "delivered" | "read";
+export type MessageStatus = "pending" | "sending" | "sent" | "delivered" | "read" | "failed";
 
 export type FilterTab = "all" | "unread" | "favourites" | "groups";
 
@@ -23,7 +23,19 @@ export interface Conversation {
   reactionEmoji?: string;
 }
 
-export interface ArchivedConversations {
+export interface ChatFilterState {
   count: number;
   isVisible: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  text: string;
+  sender: "me" | "them";
+  time: string;
+  type?: "text" | "image";
+  isRead?: boolean;
+  status?: MessageStatus;
+  timestamp?: number;
+  serverId?: number;
 }

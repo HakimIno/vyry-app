@@ -19,7 +19,8 @@ import { ThemedView } from "@/components/themed-view";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { getAvatarUrl } from "@/components/ui/avatar-picker-sheet";
 import { WHATSAPP_GREEN, DEFAULT_DEVICE_ID } from "@/constants/chat";
-import { useChat, ChatMessage } from "@/hooks/use-chat";
+import { useChat } from "@/hooks/use-chat";
+import { ChatMessage } from "@/types/chat";
 
 export default function ChatScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -112,9 +113,24 @@ export default function ChatScreen() {
                             >
                                 {item.text}
                             </ThemedText>
-                            <ThemedText style={[styles.messageTime, { color: item.sender === "me" ? "rgba(255,255,255,0.7)" : "#8E8E93" }]}>
-                                {item.time}
-                            </ThemedText>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 4 }}>
+                                <ThemedText style={[styles.messageTime, { color: item.sender === "me" ? "rgba(255,255,255,0.7)" : "#8E8E93", marginTop: 0 }]}>
+                                    {item.time}
+                                </ThemedText>
+                                {item.sender === "me" && (
+                                    <Ionicons
+                                        name={
+                                            item.status === "pending" || item.status === "sending" ? "time-outline" :
+                                                item.status === "failed" ? "alert-circle-outline" :
+                                                    item.status === "read" ? "checkmark-done-outline" :
+                                                        "checkmark-outline"
+                                        }
+                                        size={14}
+                                        color={item.status === "read" ? "#4DA6FF" : "rgba(255,255,255,0.7)"}
+                                        style={{ marginLeft: 4 }}
+                                    />
+                                )}
+                            </View>
                         </View>
                     )}
                 />

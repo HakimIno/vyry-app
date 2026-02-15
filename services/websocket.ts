@@ -6,12 +6,16 @@ type MessageHandler = (data: unknown) => void;
 class WebSocketService {
     private ws: WebSocket | null = null;
     private listeners: MessageHandler[] = [];
+    private connectionListeners: ((isConnected: boolean) => void)[] = [];
     private reconnectInterval: ReturnType<typeof setInterval> | null = null;
+    private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
     private isConnecting = false;
+    private manuallyClosed = false;
 
     async connect() {
         if (this.ws?.readyState === WebSocket.OPEN || this.isConnecting) return;
         this.isConnecting = true;
+        this.manuallyClosed = false;
 
         const token = await SecureKV.get("auth.accessToken");
         if (!token) {
@@ -28,10 +32,13 @@ class WebSocketService {
         this.ws.onopen = () => {
             console.log("[WS] Connected");
             this.isConnecting = false;
+            this.notifyConnectionListeners(true);
             if (this.reconnectInterval) {
                 clearInterval(this.reconnectInterval);
                 this.reconnectInterval = null;
             }
+            // Start heartbeat to keep connection alive
+            this.startHeartbeat();
         };
 
         this.ws.onmessage = (event) => {
@@ -49,18 +56,22 @@ class WebSocketService {
             console.log("[WS] Disconnected");
             this.isConnecting = false;
             this.ws = null;
-            this.scheduleReconnect();
+            this.stopHeartbeat();
+            this.notifyConnectionListeners(false);
+            if (!this.manuallyClosed) {
+                this.scheduleReconnect();
+            }
         };
 
         this.ws.onerror = (e) => {
-            // Suppress verbose error object logging. 
-            // Most WS errors are connection issues handled by onclose/reconnect.
-            console.log("[WS] Connection error (suppressed details)");
+            console.warn("[WS] Connection error");
             this.isConnecting = false;
         };
     }
 
     disconnect() {
+        this.manuallyClosed = true;
+        this.stopHeartbeat();
         if (this.ws) {
             this.ws.close();
             this.ws = null;
@@ -71,13 +82,41 @@ class WebSocketService {
         }
     }
 
-    send(data: unknown) {
+    send(data: unknown): boolean {
         if (this.ws?.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(data));
+            return true;
         } else {
             console.warn("[WS] Not connected, cannot send message");
-            // Optional: Queue messages?
+            return false;
         }
+    }
+
+    /**
+     * Wait for the connection to be established.
+     * @param timeoutMs Max time to wait (default 5000ms)
+     * @returns true if connected, false if timed out
+     */
+    async waitForConnection(timeoutMs = 5000): Promise<boolean> {
+        if (this.ws?.readyState === WebSocket.OPEN) return true;
+
+        if (!this.isConnecting && !this.ws) {
+            this.connect();
+        }
+
+        return new Promise((resolve) => {
+            const start = Date.now();
+            const check = setInterval(() => {
+                if (this.ws?.readyState === WebSocket.OPEN) {
+                    clearInterval(check);
+                    resolve(true);
+                }
+                if (Date.now() - start > timeoutMs) {
+                    clearInterval(check);
+                    resolve(false);
+                }
+            }, 100);
+        });
     }
 
     addMessageListener(handler: MessageHandler) {
@@ -85,6 +124,42 @@ class WebSocketService {
         return () => {
             this.listeners = this.listeners.filter(l => l !== handler);
         };
+    }
+
+    addConnectionListener(handler: (isConnected: boolean) => void) {
+        this.connectionListeners.push(handler);
+        // Notify current state immediately
+        handler(this.ws?.readyState === WebSocket.OPEN);
+        return () => {
+            this.connectionListeners = this.connectionListeners.filter(l => l !== handler);
+        };
+    }
+
+    private notifyConnectionListeners(isConnected: boolean) {
+        for (const listener of this.connectionListeners) {
+            try {
+                listener(isConnected);
+            } catch (e) {
+                console.error("[WS] Connection listener error", e);
+            }
+        }
+    }
+
+    private startHeartbeat() {
+        this.stopHeartbeat();
+        this.heartbeatInterval = setInterval(() => {
+            if (this.ws?.readyState === WebSocket.OPEN) {
+                // Send a lightweight ping message to keep connection alive
+                this.ws.send(JSON.stringify({ type: "Ping" }));
+            }
+        }, 25000); // Every 25 seconds
+    }
+
+    private stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
     }
 
     private scheduleReconnect() {

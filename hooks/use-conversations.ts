@@ -1,47 +1,40 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useFriends } from '@/hooks/use-friends';
 import { MessageStorage } from '@/features/chat/storage';
 import { Conversation } from '@/types/chat';
 
 export function useConversations() {
     const { data: friends, isLoading, error, refetch } = useFriends();
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const friendsRef = useRef(friends);
+    friendsRef.current = friends;
 
-    // Subscribe to storage updates
-    useEffect(() => {
-        const unsubscribe = MessageStorage.subscribe(() => {
-            setRefreshTrigger(prev => prev + 1);
-        });
-        return unsubscribe;
-    }, []);
+    // Build conversations from friends + storage data
+    const buildConversations = useCallback((): Conversation[] => {
+        const currentFriends = friendsRef.current;
+        if (!currentFriends) return [];
 
-    const conversations: Conversation[] = useMemo(() => {
-        if (!friends) return [];
+        return currentFriends.map(friend => {
+            const convId = MessageStorage.getConversationId(friend.user_id);
+            const lastMsg = convId ? MessageStorage.getLastMessage(convId) : undefined;
+            const unreadCount = convId ? MessageStorage.getUnreadCount(convId) : 0;
 
-        return friends.map(friend => {
-            const lastMsg = MessageStorage.getLastMessage(friend.user_id);
-
-            // Format timestamp
             let timestamp = new Date(friend.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             let lastMessageText = "Start a conversation";
+            let rawTimestamp = 0;
 
             if (lastMsg) {
-                const date = new Date(lastMsg.time);
-                // If today, show time. If yesterday, show "Yesterday". Else date.
+                const timestampVal = lastMsg.timestamp || Date.now();
+                const date = new Date(timestampVal);
                 const now = new Date();
                 const isToday = date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
 
-                if (isToday) {
-                    timestamp = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                } else {
-                    timestamp = date.toLocaleDateString();
-                }
+                timestamp = isToday
+                    ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : date.toLocaleDateString();
 
-                if (lastMsg.type === 'image') {
-                    lastMessageText = 'Sent an image';
-                } else {
-                    lastMessageText = lastMsg.text;
-                }
+                lastMessageText = lastMsg.type === 'image' ? 'Sent an image' : lastMsg.text;
+                rawTimestamp = timestampVal;
             }
 
             return {
@@ -50,20 +43,33 @@ export function useConversations() {
                 avatarSeed: friend.user_id,
                 avatarUrl: friend.profile_picture || undefined,
                 lastMessage: lastMessageText,
-                timestamp: timestamp,
-                unreadCount: MessageStorage.getUnreadCount(friend.user_id),
+                timestamp,
+                unreadCount,
                 isPinned: false,
                 isGroup: false,
-                isOnline: false, // TODO: Implement online status
-                rawTimestamp: lastMsg ? new Date(lastMsg.time).getTime() : 0 // For sorting
-            };
-        }).sort((a, b) => b.rawTimestamp - a.rawTimestamp); // Sort by newest first
-    }, [friends, refreshTrigger]);
+                isOnline: false,
+                rawTimestamp,
+            } as Conversation & { rawTimestamp: number };
+        }).sort((a, b) => b.rawTimestamp - a.rawTimestamp);
+    }, []); // No deps — reads from ref
+
+    // Rebuild when friends data changes
+    useEffect(() => {
+        setConversations(buildConversations());
+    }, [friends, buildConversations]);
+
+    // Subscribe to storage updates — rebuild conversations when messages change
+    useEffect(() => {
+        const unsubscribe = MessageStorage.subscribe(() => {
+            setConversations(buildConversations());
+        });
+        return unsubscribe;
+    }, [buildConversations]);
 
     return {
         conversations,
         isLoading,
         error,
-        refetch
+        refetch,
     };
 }

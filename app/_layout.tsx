@@ -3,7 +3,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native
 import { Redirect, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "react-native-reanimated";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
@@ -11,6 +11,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "@/features/auth/auth-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { wsService } from "@/services/websocket";
+import { OutboxService } from "@/services/outbox";
+import { BackgroundChatService } from "@/services/background-chat";
+import { RealmManager } from "@/features/chat/realm";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -29,6 +32,13 @@ export { queryClient };
  */
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
+
+  // Initialize Services
+  useEffect(() => {
+    OutboxService.getInstance();
+    BackgroundChatService.getInstance().init();
+  }, []);
+
   // Handle WebSocket connection
   useEffect(() => {
     if (state.status === "signedIn") {
@@ -122,6 +132,7 @@ function RootLayoutContent() {
 }
 
 export default function RootLayout() {
+  const [dbInitialized, setDbInitialized] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
     LINESeedSansTH_Rg: require("../assets/font/LINESeedSansTH_A_Rg.ttf"),
     LINESeedSansTH_Th: require("../assets/font/LINESeedSansTH_A_Th.ttf"),
@@ -131,14 +142,20 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // Hide splash only when fonts are ready
-    if (fontsLoaded || fontError) {
+    RealmManager.init()
+      .then(() => setDbInitialized(true))
+      .catch((e: unknown) => console.error("Failed to init Realm", e));
+  }, []);
+
+  useEffect(() => {
+    // Hide splash only when fonts AND DB are ready
+    if ((fontsLoaded || fontError) && dbInitialized) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, dbInitialized]);
 
-  // Wait for fonts before rendering anything
-  if (!fontsLoaded && !fontError) {
+  // Wait for fonts & DB before rendering anything
+  if ((!fontsLoaded && !fontError) || !dbInitialized) {
     return null;
   }
 

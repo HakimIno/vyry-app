@@ -14,6 +14,7 @@ import { SecureKV } from "@/lib/secure-store";
 import { uuidv4 } from "@/lib/uuid";
 import { useProfileStore } from "@/stores/profile-store";
 import { SignalService } from "@/services/signal";
+import { MessageStorage } from "@/features/chat/storage";
 
 import type { VerifyOtpResponse } from "./auth-types";
 import { useCheckPinStatus, useSkipPinSetup } from "./auth-hooks";
@@ -399,16 +400,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await AuthStorage.clearSession();
+    try {
+      // 1. Clear Auth Session
+      await AuthStorage.clearSession();
 
-    // Reset bootstrap flag
-    bootstrapRunRef.current = false;
+      // 2. Clear Chat Data (Messages & Signal Keys)
+      // Important to do this to prevent next user from seeing old messages or using wrong keys
+      MessageStorage.clearAll();
+      await SignalService.getInstance().clear();
 
-    // Clear app data
-    await useProfileStore.getState().reset();
-    queryClient.clear();
+      // 3. Application State Cleanup
+      bootstrapRunRef.current = false;
+      await useProfileStore.getState().reset();
+      queryClient.clear();
 
-    setState({ status: "signedOut" });
+      setState({ status: "signedOut" });
+    } catch (e) {
+      console.error("[Auth] Error during sign out cleanup:", e);
+      // Force signout state anyway
+      setState({ status: "signedOut" });
+    }
   }, []);
 
   // Handle app state changes

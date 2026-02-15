@@ -214,6 +214,7 @@ export default function ChatsScreen() {
 
       <FlashList<Conversation>
         data={filteredConversations}
+        extraData={filteredConversations.map(c => `${c.id}:${c.lastMessage}:${c.unreadCount}:${c.timestamp}`).join('|')}
         keyExtractor={keyExtractor}
         renderItem={renderConversationItem}
         contentContainerStyle={{

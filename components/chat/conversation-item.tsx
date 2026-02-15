@@ -199,6 +199,24 @@ export const ConversationItem = React.memo(
         </View>
       </Pressable>
     );
+  },
+  // Custom comparison: only re-render when displayed data actually changes
+  (prevProps, nextProps) => {
+    const prev = prevProps.conversation;
+    const next = nextProps.conversation;
+    return (
+      prev.id === next.id &&
+      prev.lastMessage === next.lastMessage &&
+      prev.timestamp === next.timestamp &&
+      prev.unreadCount === next.unreadCount &&
+      prev.isOnline === next.isOnline &&
+      prev.isTyping === next.isTyping &&
+      prev.messageStatus === next.messageStatus &&
+      prev.name === next.name &&
+      prev.avatarUrl === next.avatarUrl &&
+      prevProps.onPress === nextProps.onPress &&
+      prevProps.onLongPress === nextProps.onLongPress
+    );
   }
 );
 

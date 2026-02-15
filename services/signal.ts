@@ -252,4 +252,14 @@ export class SignalService {
         // Fallback for any other case
         return Buffer.from(data as never).buffer;
     }
+
+    /**
+     * Clear all Signal Protocol data (keys, sessions, etc.)
+     */
+    async clear(): Promise<void> {
+        await store.clearStore();
+        // Reset instance so it re-initializes next time if needed
+        // Actually singleton instance might stay, but store is cleared.
+        console.log('[SignalService] Cleared all data');
+    }
 }
