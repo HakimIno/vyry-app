@@ -53,6 +53,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     };
   }, [state.status]);
 
+  // Reconnect WebSocket + flush outbox immediately when app comes to foreground
+  useEffect(() => {
+    if (state.status !== "signedIn") return;
+
+    const { AppState } = require("react-native");
+    const sub = AppState.addEventListener("change", (nextState: string) => {
+      if (nextState === "active") {
+        wsService.ensureConnected();
+        // Flush outbox after a short delay to give WS time to connect
+        setTimeout(() => {
+          OutboxService.getInstance().processQueue();
+        }, 500);
+      }
+    });
+
+    return () => sub.remove();
+  }, [state.status]);
+
   const segments = useSegments();
   const inAuthGroup = segments[0] === "(auth)";
   const currentRoute = segments[segments.length - 1] || segments[0];

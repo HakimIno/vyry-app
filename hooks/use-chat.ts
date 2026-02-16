@@ -109,9 +109,8 @@ export function useChat(friendId: string, friendDeviceId: number = DEFAULT_DEVIC
             timestamp: Date.now(),
         };
 
-        // UI Update & Persist
-        MessageStorage.saveMessage(conversationId, newMsg); // Persist immediately
-        setMessages(prev => [...prev, newMsg]);
+        // Persist — the MessageStorage.subscribe callback will update setMessages
+        MessageStorage.saveMessage(conversationId, newMsg);
 
         try {
             await OutboxService.getInstance().enqueue(

@@ -22,16 +22,19 @@ const outboxStorage = createMMKV({
 });
 
 const QUEUE_KEY = "outbox_queue";
+const MAX_RETRIES = 5;
+const RETRY_DELAY_MS = 2000;
 
 export class OutboxService {
     private static instance: OutboxService;
     private isProcessing = false;
+    private retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     private constructor() {
         // Listen for connection to process queue
         wsService.addConnectionListener((isConnected) => {
             if (isConnected) {
-                this.processQueue();
+                this.scheduleProcess(0); // Flush immediately on connect
             }
         });
     }
@@ -50,6 +53,18 @@ export class OutboxService {
 
     private saveQueue(queue: OutboxItem[]) {
         outboxStorage.set(QUEUE_KEY, JSON.stringify(queue));
+    }
+
+    /**
+     * Schedule a processQueue call after `delayMs`.
+     * Deduplicates — only one pending timer at a time.
+     */
+    private scheduleProcess(delayMs: number) {
+        if (this.retryTimer) clearTimeout(this.retryTimer);
+        this.retryTimer = setTimeout(() => {
+            this.retryTimer = null;
+            this.processQueue();
+        }, delayMs);
     }
 
     public async enqueue(
@@ -76,67 +91,91 @@ export class OutboxService {
 
         console.log(`[Outbox] Enqueued message ${clientMessageId}`);
 
-        // Optimistically trigger processing
+        // Trigger processing
         this.processQueue();
     }
 
     public async processQueue() {
+        // ──────────────────────────────────────────────────────
+        // CRITICAL: Set flag FIRST to prevent re-entrancy.
+        // Previous bug: flag was set AFTER the async waitForConnection,
+        // allowing multiple concurrent processQueue calls.
+        // ──────────────────────────────────────────────────────
         if (this.isProcessing) return;
-
-        // Check connection first
-        const isConnected = await wsService.waitForConnection(1000); // Wait briefly
-        if (!isConnected) {
-            console.log("[Outbox] Offline, pausing processing");
-            return;
-        }
-
         this.isProcessing = true;
-        console.log("[Outbox] Starting processing...");
 
         try {
-            let queue = this.getQueue();
-
-            // Process one by one to ensure order (Signal Protocol requirement)
-            // We cannot run in parallel for the same recipient
-            while (queue.length > 0) {
-                const item = queue[0]; // Peek
-
-                try {
-                    console.log(`[Outbox] Processing item ${item.clientMessageId}`);
-
-                    // Update status to sending
-                    MessageStorage.updateMessageStatus(item.conversationId, item.clientMessageId, "sending");
-
-                    await this.sendMessage(item);
-
-                    // Success! Remove from queue
-                    queue.shift();
-                    this.saveQueue(queue);
-
-                    // Update status to sent
-                    MessageStorage.updateMessageStatus(item.conversationId, item.clientMessageId, "sent");
-
-                } catch (error) {
-                    console.error(`[Outbox] Failed to send item ${item.clientMessageId}`, error);
-
-                    // Update status to failed (user can see it) but we might keep it in queue?
-                    // For now, let's keep it in queue but increment retry. 
-                    // If retry > MAX, move to 'dead letter' or just leave it for now.
-                    // Actually, if we fail to encrypt/send, we should probably stop processing this queue 
-                    // to avoid out-of-order delivery if we were to skip it.
-
-                    item.retryCount++;
-                    queue[0] = item; // Update retry count
-                    this.saveQueue(queue);
-
-                    MessageStorage.updateMessageStatus(item.conversationId, item.clientMessageId, "failed");
-
-                    // Break loop, wait for next trigger (e.g. reconnect or manual retry)
-                    break;
-                }
+            const queue = this.getQueue();
+            if (queue.length === 0) {
+                return; // Nothing to do
             }
+
+            // Wait for WebSocket to be ready
+            const isConnected = await wsService.waitForConnection(5000);
+            if (!isConnected) {
+                console.log("[Outbox] Offline, will retry in 3s...");
+                this.scheduleProcess(3000);
+                return;
+            }
+
+            console.log(`[Outbox] Starting processing... (${queue.length} items)`);
+            await this.drainQueue();
+
         } finally {
             this.isProcessing = false;
+        }
+    }
+
+    private async drainQueue() {
+        let queue = this.getQueue();
+
+        while (queue.length > 0) {
+            const item = queue[0];
+
+            // Skip items that have exceeded max retries
+            if (item.retryCount >= MAX_RETRIES) {
+                console.warn(`[Outbox] Message ${item.clientMessageId} exceeded ${MAX_RETRIES} retries, dropping`);
+                MessageStorage.updateMessageStatus(item.conversationId, item.clientMessageId, "failed");
+                queue.shift();
+                this.saveQueue(queue);
+                continue;
+            }
+
+            try {
+                console.log(`[Outbox] Processing item ${item.clientMessageId} (attempt ${item.retryCount + 1})`);
+
+                // Update status to sending
+                MessageStorage.updateMessageStatus(item.conversationId, item.clientMessageId, "sending");
+
+                await this.sendMessage(item);
+
+                // Success! Remove from queue
+                queue.shift();
+                this.saveQueue(queue);
+
+                // Update status to sent
+                MessageStorage.updateMessageStatus(item.conversationId, item.clientMessageId, "sent");
+                console.log(`[Outbox] ✓ Sent ${item.clientMessageId}`);
+
+            } catch (error) {
+                console.error(`[Outbox] ✗ Failed ${item.clientMessageId}:`, error);
+
+                item.retryCount++;
+                queue[0] = item;
+                this.saveQueue(queue);
+
+                // If WS disconnected mid-send, schedule retry (don't mark as failed yet)
+                if (item.retryCount < MAX_RETRIES) {
+                    MessageStorage.updateMessageStatus(item.conversationId, item.clientMessageId, "pending");
+                    console.log(`[Outbox] Will retry in ${RETRY_DELAY_MS}ms (attempt ${item.retryCount}/${MAX_RETRIES})`);
+                    this.scheduleProcess(RETRY_DELAY_MS);
+                } else {
+                    MessageStorage.updateMessageStatus(item.conversationId, item.clientMessageId, "failed");
+                }
+
+                // Stop processing to maintain message order
+                break;
+            }
         }
     }
 
@@ -180,12 +219,8 @@ export class OutboxService {
             }
         };
 
-        // 3. Send via WS
-        // We use send() and assume if it returns true, it's "Sent" to the wire.
-        // Ideally we'd wait for an ACK from server, but that requires protocol changes.
-        // For now, if WS is open and send() works, we assume success.
-        const sent = wsService.send(payload);
-        if (!sent) {
+        // 3. Send via WS — verify connection is still alive before sending
+        if (!wsService.send(payload)) {
             throw new Error("WebSocket not connected");
         }
     }
