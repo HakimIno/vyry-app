@@ -2,7 +2,7 @@ import { createMMKV } from "react-native-mmkv";
 import { SignalService } from "./signal";
 import { wsService } from "./websocket";
 import { MessageStorage } from "@/features/chat/storage";
-import { uuidv4 } from "@/lib/uuid";
+import { uuidv4, parse } from "@/lib/uuid";
 import { Buffer } from "buffer";
 
 interface OutboxItem {
@@ -206,9 +206,9 @@ export class OutboxService {
         const payload = {
             type: "SignalMessage",
             payload: {
-                conversation_id: item.conversationId,
-                client_message_id: item.clientMessageId,
-                recipient_id: item.recipientId,
+                conversation_id: parse(item.conversationId),
+                client_message_id: parse(item.clientMessageId),
+                recipient_id: parse(item.recipientId),
                 recipient_device_id: item.recipientDeviceId,
                 content: contentArray,
                 iv: Array.from(new Uint8Array(ciphertext.registrationId === undefined ? [] : [])),

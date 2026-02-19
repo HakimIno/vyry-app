@@ -181,8 +181,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     stateSnapshotRef.current = state;
 
     if (state.status === "signedIn") {
+      // Get user ID from profile store or decode token if needed.
+      // For now, let's try to get it from profile store if available, or just rely on local keys if not?
+      // Wait, we need userId for the fix.
+      // We can get it from the state if we add it to AuthState, OR we can fetch profile here.
+      // The most reliable way without changing AuthState much is to fetch profile or decode token.
+      // But we have useProfileStore!
+      const userProfile = useProfileStore.getState().profile;
+      const userId = userProfile?.user_id;
+
       SignalService.getInstance()
-        .ensureKeys()
+        .ensureKeys(false, userId ? { userId } : undefined)
         .catch((e) => {
           console.error("[Auth] Failed to ensure Signal keys:", e);
         });

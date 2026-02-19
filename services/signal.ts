@@ -27,6 +27,10 @@ interface PreKeyBundleResponse {
     };
 }
 
+export type ValidateKeysOptions = {
+    userId: string;
+};
+
 export class SignalService {
     private static instance: SignalService;
 
@@ -58,16 +62,107 @@ export class SignalService {
     }
 
     /**
-     * Ensure keys exist. If not, generate and upload them.
+     * Ensure keys exist. If forceRefresh is true, re-upload keys even if they exist locally.
+     * Checks server to verify if keys actually exist.
      */
-    async ensureKeys(): Promise<void> {
-        if (await this.hasKeys()) {
-            console.log('[SignalService] Keys already exist');
+    async ensureKeys(forceRefresh = false, options?: ValidateKeysOptions): Promise<void> {
+        const hasLocalKeys = await this.hasKeys();
+
+        if (hasLocalKeys && !forceRefresh) {
+            // If we have options, verify with server
+            if (options?.userId) {
+                const keysExistOnServer = await this.validateKeysOnServer(options.userId);
+                if (keysExistOnServer) {
+                    console.log('[SignalService] Keys verified on server');
+                    return;
+                }
+                console.log('[SignalService] Keys missing on server despite local presence, re-uploading...');
+            } else {
+                console.log('[SignalService] Keys exist locally (server verification skipped due to missing userId)');
+                return;
+            }
+        }
+
+        if (forceRefresh) {
+            console.log('[SignalService] Forcing key refresh/upload...');
+            await this.refreshKeys();
             return;
         }
 
-        console.log('[SignalService] No keys found, generating...');
+        console.log('[SignalService] No keys found or server missing keys, generating...');
+        // If we have local keys but server is missing them, we should probably upload EXISTING keys
+        // or just generate new ones to be safe and consistent.
+        // Let's regenerate to ensure clean state.
+
+        // Wait, if we regenerate, we lose old sessions potentially?
+        // But if server lost keys, sessions are likely broken anyway for new messages.
+        // Use generateAndUploadKeys which also updates local store.
         await this.generateAndUploadKeys();
+    }
+
+    /**
+     * Verify if the current device's keys are present on the server.
+     */
+    async validateKeysOnServer(userId: string): Promise<boolean> {
+        try {
+            const registrationId = await store.getLocalRegistrationId();
+            if (!registrationId) return false;
+
+            const devices = await this.getDevices(userId);
+            const currentDevice = devices.find(d => d.registration_id === registrationId);
+
+            if (!currentDevice) {
+                console.log('[SignalService] Device not found in user device list');
+                return false;
+            }
+
+            // Try to fetch our own bundle to see if keys are really there
+            await apiFetch(`/api/v1/keys/${userId}/devices/${currentDevice.device_id}`, {
+                auth: true
+            });
+
+            return true;
+        } catch (error: any) {
+            // 404 means keys are missing
+            if (error?.status === 404) {
+                return false;
+            }
+            // For other errors, assume true to avoid infinite loops if API is down
+            console.error('[SignalService] Error validating keys on server:', error);
+            return true;
+        }
+    }
+
+    /**
+     * Refresh keys: Keep identity, generate new pre-keys, and upload.
+     */
+    async refreshKeys(): Promise<void> {
+        const identity = await store.getIdentityKeyPair();
+        const registrationId = await store.getLocalRegistrationId();
+
+        if (!identity || !registrationId) {
+            await this.generateAndUploadKeys();
+            return;
+        }
+
+        // Generate NEW keys
+        const signedPreKeyId = (Date.now() % 10000) + 1; // Simple random ID
+        const signedPreKey = await KeyHelper.generateSignedPreKey(identity, signedPreKeyId);
+
+        const preKeys = [];
+        const startId = Math.floor(Math.random() * 10000);
+        for (let i = 0; i < 20; i++) {
+            preKeys.push(await KeyHelper.generatePreKey(startId + i));
+        }
+
+        // Store
+        await store.storeSignedPreKey(signedPreKey.keyId, signedPreKey.keyPair);
+        for (const key of preKeys) {
+            await store.storePreKey(key.keyId, key.keyPair);
+        }
+
+        // Upload
+        await this.uploadKeys(registrationId, identity, signedPreKey, preKeys);
     }
 
     /**
@@ -78,8 +173,7 @@ export class SignalService {
         // 1. Generate Keys
         const registrationId = KeyHelper.generateRegistrationId();
         const identityKeyPair = await KeyHelper.generateIdentityKeyPair();
-        // Generate pre-keys manually since generatePreKeys is missing in this version
-        // Reduced from 100 to 20 for faster generation (still plenty for security)
+        // Generate pre-keys manually
         const preKeys = [];
         for (let i = 0; i < 20; i++) {
             preKeys.push(await KeyHelper.generatePreKey(i));
@@ -96,6 +190,17 @@ export class SignalService {
         await store.storeSignedPreKey(signedPreKey.keyId, signedPreKey.keyPair);
 
         // 3. Upload to API
+        await this.uploadKeys(registrationId, identityKeyPair, signedPreKey, preKeys);
+
+        return { registrationId };
+    }
+
+    private async uploadKeys(
+        registrationId: number,
+        identityKeyPair: any,
+        signedPreKey: any,
+        preKeys: any[]
+    ) {
         try {
             // Convert ArrayBuffers to Arrays for JSON serialization
             const uploadDto = {
@@ -123,8 +228,6 @@ export class SignalService {
             console.error('[SignalService] Failed to upload keys:', error);
             throw error;
         }
-
-        return { registrationId };
     }
 
     /**

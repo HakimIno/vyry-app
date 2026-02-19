@@ -202,6 +202,21 @@ export const MessageStorage = {
         }
     },
 
+    clearAll: () => {
+        try {
+            const realm = RealmManager.get();
+            realm.write(() => {
+                const messages = realm.objects<Message>('Message');
+                const conversations = realm.objects<Conversation>('Conversation');
+                realm.delete(messages);
+                realm.delete(conversations);
+            });
+            MessageStorage.notifyListeners();
+        } catch (e) {
+            console.error('[MessageStorage] Failed to clear all', e);
+        }
+    },
+
     subscribe: (listener: Listener) => {
         listeners.add(listener);
         return () => { listeners.delete(listener); };

@@ -2,7 +2,7 @@ import { wsService } from "./websocket";
 import { SignalService } from "./signal";
 import { MessageStorage } from "@/features/chat/storage";
 import { ChatMessage } from "@/types/chat";
-import { uuidv4 } from "@/lib/uuid";
+import { uuidv4, ensureUuidString } from "@/lib/uuid";
 
 export class BackgroundChatService {
     private static instance: BackgroundChatService;
@@ -171,13 +171,21 @@ export class BackgroundChatService {
 
     // Refactored from handleIncomingMessage to allow reuse or cleaner code
     private async processSignalPayload(payload: any, originalMessageId?: number | string) {
-        if (!payload.sender_id || !payload.content || typeof payload.message_type !== 'number') return;
+        // Normalize UUIDs (MessagePack might send them as Uint8Array/Array)
+        const senderId = ensureUuidString(payload.sender_id);
+        const conversationId = ensureUuidString(payload.conversation_id);
+        const clientMessageId = ensureUuidString(payload.client_message_id);
 
-        const messageId = payload.client_message_id || (originalMessageId ? originalMessageId.toString() : uuidv4());
+        if (!senderId || !payload.content || typeof payload.message_type !== 'number') {
+            console.warn("[BackgroundChat] Invalid payload structure", { senderId, hasContent: !!payload.content, type: payload.message_type });
+            return;
+        }
+
+        const messageId = clientMessageId || (originalMessageId ? originalMessageId.toString() : uuidv4());
 
         // 1. Check for duplicate processing BEFORE decryption to avoid Ratchet errors
         // (If we already have this message ID, we must not decrypt again)
-        const existingConvId = MessageStorage.getConversationId(payload.sender_id);
+        const existingConvId = MessageStorage.getConversationId(senderId);
         if (existingConvId) {
             const existingMsgs = MessageStorage.getMessages(existingConvId);
             if (existingMsgs.some(m => m.id === messageId)) {
@@ -186,41 +194,44 @@ export class BackgroundChatService {
             }
         }
 
-        console.log(`[BackgroundChat] Received message from ${payload.sender_id}`);
+        console.log(`[BackgroundChat] Received message from ${senderId}`);
 
         try {
             // Decrypt
             let contentBuffer: Uint8Array;
             if (Array.isArray(payload.content)) {
                 contentBuffer = new Uint8Array(payload.content as number[]);
+            } else if (payload.content instanceof Uint8Array) {
+                contentBuffer = payload.content;
             } else {
+                console.warn("[BackgroundChat] Invalid content format");
                 return;
             }
 
             const decrypted = await SignalService.getInstance().decryptMessage(
-                payload.sender_id,
+                senderId,
                 payload.sender_device_id || 1,
                 contentBuffer,
                 payload.message_type
             );
 
             // Check mapping again (in case it changed during async)
-            const currentConvId = MessageStorage.getConversationId(payload.sender_id);
-            let conversationId = payload.conversation_id;
+            const currentConvId = MessageStorage.getConversationId(senderId);
+            let finalConversationId = conversationId;
 
-            if (!conversationId && currentConvId) {
-                conversationId = currentConvId;
+            if (!finalConversationId && currentConvId) {
+                finalConversationId = currentConvId;
             }
 
             // If still no conversation ID, look for mapping again or create it
-            if (!conversationId) {
+            if (!finalConversationId) {
                 console.warn("[BackgroundChat] Received message but no conversation ID found locally");
                 return;
             }
 
             // Ensure mapping exists
             if (!currentConvId) {
-                MessageStorage.saveConversationMapping(payload.sender_id, conversationId);
+                MessageStorage.saveConversationMapping(senderId, finalConversationId);
             }
 
             const newMsg: ChatMessage = {
@@ -234,7 +245,7 @@ export class BackgroundChatService {
             };
 
             // Save to storage FIRST
-            MessageStorage.saveMessage(conversationId, newMsg);
+            MessageStorage.saveMessage(finalConversationId, newMsg);
 
             console.log(`[BackgroundChat] Saved message: ${newMsg.text.substring(0, 10)}...`);
 
@@ -244,6 +255,7 @@ export class BackgroundChatService {
                 console.log(`[BackgroundChat] Duplicate message detected during decryption (MessageCounterError), skipping.`);
                 return;
             }
+            console.error("[BackgroundChat] Failed to process signal payload:", e);
         }
     }
 }

@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from "@/lib/env";
 import { SecureKV } from "@/lib/secure-store";
+import { encode, decode } from "@msgpack/msgpack";
 
 type MessageHandler = (data: unknown) => void;
 
@@ -40,50 +41,10 @@ class WebSocketService {
             }
 
             const ws = new WebSocket(url);
-
-            ws.onopen = () => {
-                console.log("[WS] Connected");
-                this.ws = ws;
-                this.isConnecting = false;
-                this.reconnectAttempts = 0; // Reset on successful connect
-                this.clearReconnectTimer();
-                this.notifyConnectionListeners(true);
-                this.startHeartbeat();
-            };
-
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    // Iterate over a copy to allow listener removal during iteration
-                    const snapshot = [...this.listeners];
-                    for (const listener of snapshot) {
-                        listener(data);
-                    }
-                } catch (e) {
-                    console.error("[WS] Failed to parse message", e);
-                }
-            };
-
-            ws.onclose = (event) => {
-                console.log(`[WS] Disconnected (code=${event?.code || "?"})`);
-                this.isConnecting = false;
-                this.ws = null;
-                this.stopHeartbeat();
-                this.notifyConnectionListeners(false);
-                if (!this.manuallyClosed) {
-                    this.scheduleReconnect();
-                }
-            };
-
-            ws.onerror = () => {
-                console.warn("[WS] Connection error");
-                // Don't set isConnecting = false here — onclose will fire right after
-                // and handle cleanup. Setting it here causes a race condition where
-                // another connect() call could start before onclose fires.
-            };
+            ws.binaryType = "arraybuffer";
 
             // Set a connection timeout — if onopen hasn't fired in 8s, close and try again
-            setTimeout(() => {
+            const connectionTimeout = setTimeout(() => {
                 if (ws.readyState !== WebSocket.OPEN) {
                     console.warn("[WS] Connection timeout, closing stale socket");
                     ws.onopen = null;
@@ -97,6 +58,42 @@ class WebSocketService {
                     }
                 }
             }, 8000);
+
+            ws.onopen = () => {
+                console.log("[WS] Connected");
+                clearTimeout(connectionTimeout); // Clear the timeout on success
+                this.ws = ws;
+                this.isConnecting = false;
+                this.reconnectAttempts = 0; // Reset on successful connect
+                this.clearReconnectTimer();
+                this.notifyConnectionListeners(true);
+                this.startHeartbeat();
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    let data: unknown;
+                    if (typeof event.data === "string") {
+                        console.log(`[WS] Received TEXT message: ${event.data.length} chars`);
+                        data = JSON.parse(event.data);
+                    } else {
+                        // Binary MessagePack
+                        const buffer = event.data instanceof ArrayBuffer ? event.data : new Uint8Array(event.data as any).buffer;
+                        console.log(`[WS] Received BINARY message: ${buffer.byteLength} bytes`);
+                        data = decode(buffer);
+                    }
+
+                    // Debug log the decoded structure (masking binary buffers)
+                    console.log("[WS] Decoded:", JSON.stringify(data, (key, value) => {
+                        if (value instanceof Uint8Array || (value && value.type === 'Buffer')) return `[Binary: ${value.length} bytes]`;
+                        return value;
+                    }));
+
+                    this.notifyListeners(data);
+                } catch (e) {
+                    console.error("[WS] Failed to parse message", e);
+                }
+            };
 
         } catch (e) {
             console.error("[WS] Connect error:", e);
@@ -124,7 +121,7 @@ class WebSocketService {
     send(data: unknown): boolean {
         if (this.ws?.readyState === WebSocket.OPEN) {
             try {
-                this.ws.send(JSON.stringify(data));
+                this.ws.send(encode(data));
                 return true;
             } catch (e) {
                 console.error("[WS] Send error:", e);
@@ -201,11 +198,21 @@ class WebSocketService {
         }
     }
 
+    private notifyListeners(data: unknown) {
+        for (const listener of this.listeners) {
+            try {
+                listener(data);
+            } catch (e) {
+                console.error("[WS] Message listener error", e);
+            }
+        }
+    }
+
     private startHeartbeat() {
         this.stopHeartbeat();
         this.heartbeatInterval = setInterval(() => {
             if (this.ws?.readyState === WebSocket.OPEN) {
-                this.ws.send(JSON.stringify({ type: "Ping" }));
+                this.ws.send(encode({ type: "Ping", payload: {} }));
             }
         }, 25000);
     }

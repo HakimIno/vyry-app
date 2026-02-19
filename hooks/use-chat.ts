@@ -96,6 +96,24 @@ export function useChat(friendId: string, friendDeviceId: number = DEFAULT_DEVIC
     const sendMessage = useCallback(async (text: string) => {
         if (!text.trim() || !conversationId) return;
 
+        // Protection against race condition:
+        // If we are still using default device ID, try to refresh it before sending.
+        // This handles cases where user sends message before initChat active device discovery finishes.
+        let targetDeviceId = activeDeviceId;
+        if (targetDeviceId === DEFAULT_DEVICE_ID) {
+            try {
+                const devices = await SignalService.getInstance().getDevices(friendId);
+                if (devices.length > 0) {
+                    // Use the latest device
+                    targetDeviceId = devices[devices.length - 1].device_id;
+                    console.log(`[Chat] sendMessage: Resolved target device for ${friendId} to ${targetDeviceId}`);
+                    setActiveDeviceId(targetDeviceId);
+                }
+            } catch (e) {
+                console.warn("[Chat] Failed to resolve device ID before sending, falling back to default", e);
+            }
+        }
+
         const clientMessageId = uuidv4();
         const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -117,7 +135,7 @@ export function useChat(friendId: string, friendDeviceId: number = DEFAULT_DEVIC
                 conversationId,
                 clientMessageId,
                 friendId,
-                activeDeviceId,
+                targetDeviceId,
                 text
             );
         } catch (e) {
