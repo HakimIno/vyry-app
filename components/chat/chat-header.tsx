@@ -83,7 +83,7 @@ export function ChatHeader({
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
       {/* Top row with title and action buttons */}
       <View style={styles.topRow}>
-        <ThemedText style={styles.title}>Chats</ThemedText>
+        <ThemedText style={styles.title}>vyry</ThemedText>
 
         <View style={styles.rightSection}>
           {/* Profile */}

@@ -144,5 +144,28 @@ export function useChat(friendId: string, friendDeviceId: number = DEFAULT_DEVIC
         }
     }, [friendId, activeDeviceId, conversationId]);
 
-    return { messages, sendMessage, loading };
+    const retryMessage = useCallback(async (clientMessageId: string) => {
+        if (!conversationId) return;
+
+        // Find the message to get text
+        const msg = messages.find(m => m.id === clientMessageId);
+        if (!msg) {
+            console.error("[useChat] Cannot retry: message not found");
+            return;
+        }
+
+        try {
+            await OutboxService.getInstance().retry(
+                conversationId,
+                clientMessageId,
+                friendId,
+                activeDeviceId,
+                msg.text
+            );
+        } catch (e) {
+            console.error("[useChat] Failed to retry message", e);
+        }
+    }, [conversationId, friendId, activeDeviceId, messages]);
+
+    return { messages, sendMessage, retryMessage, loading };
 }

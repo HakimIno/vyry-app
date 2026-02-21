@@ -1,3 +1,4 @@
+import NetInfo, { NetInfoState } from "@react-native-community/netinfo";
 import { getApiBaseUrl } from "@/lib/env";
 import { SecureKV } from "@/lib/secure-store";
 import { encode, decode } from "@msgpack/msgpack";
@@ -13,6 +14,20 @@ class WebSocketService {
     private isConnecting = false;
     private manuallyClosed = false;
     private reconnectAttempts = 0;
+    private netInfoUnsubscribe: (() => void) | null = null;
+
+    constructor() {
+        this.setupNetInfo();
+    }
+
+    private setupNetInfo() {
+        this.netInfoUnsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
+            if (state.isConnected && !this.ws && !this.isConnecting && !this.manuallyClosed) {
+                console.log("[WS] Network restored, reconnecting immediately...");
+                this.ensureConnected();
+            }
+        });
+    }
 
     async connect() {
         if (this.ws?.readyState === WebSocket.OPEN || this.isConnecting) return;
@@ -95,6 +110,26 @@ class WebSocketService {
                 }
             };
 
+            ws.onerror = (e) => {
+                console.error("[WS] WebSocket error:", e);
+                // The onclose handler will typically fire after onerror,
+                // so we can rely on onclose to handle reconnection.
+            };
+
+            ws.onclose = (event) => {
+                console.log(`[WS] Connection closed (code: ${event.code}, reason: ${event.reason})`);
+                if (this.ws === ws) {
+                    this.ws = null;
+                }
+                this.isConnecting = false;
+                this.stopHeartbeat();
+                this.notifyConnectionListeners(false);
+
+                if (!this.manuallyClosed) {
+                    this.scheduleReconnect();
+                }
+            };
+
         } catch (e) {
             console.error("[WS] Connect error:", e);
             this.isConnecting = false;
@@ -141,8 +176,8 @@ class WebSocketService {
     async waitForConnection(timeoutMs = 5000): Promise<boolean> {
         if (this.ws?.readyState === WebSocket.OPEN) return true;
 
-        // Kick off a connect if not already happening
-        if (!this.isConnecting && !this.ws) {
+        // Kick off a connect if not already happening or if socket is closed
+        if (!this.isConnecting && (!this.ws || this.ws.readyState === WebSocket.CLOSED || this.ws.readyState === WebSocket.CLOSING)) {
             this.connect();
         }
 

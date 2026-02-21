@@ -92,31 +92,31 @@ export class BackgroundChatService {
             // syncMsg structure from server: SyncMessageDto
             // { message_id, conversation_id, client_message_id, sender_id, content: [], ... }
 
-            const messageId = syncMsg.client_message_id || uuidv4();
+            // Normalize UUIDs
+            const senderId = ensureUuidString(syncMsg.sender_id);
+            const conversationIdRaw = ensureUuidString(syncMsg.conversation_id);
+            const clientMessageId = ensureUuidString(syncMsg.client_message_id) || uuidv4();
+
+            if (!senderId) {
+                console.warn("[BackgroundChat] Sync message missing sender_id, skipping");
+                return;
+            }
+
+            const messageId = clientMessageId;
             const serverId = syncMsg.message_id; // i64 from server
 
             // 1. Check for duplicate processing
-            const existingConvId = MessageStorage.getConversationId(syncMsg.sender_id);
+            const existingConvId = MessageStorage.getConversationId(senderId);
             if (existingConvId) {
                 const existingMsgs = MessageStorage.getMessages(existingConvId);
                 const existing = existingMsgs.find(m => m.id === messageId);
                 if (existing) {
-                    // Update server_id if missing?
-                    if (!existing.serverId && serverId) {
-                        // TODO: We could update it, but storage.saveMessage handles replace.
-                        // We should respect local state if possible.
-                        // For now, let's assume we skip if we have it, OR we overwrite to ensure consistency.
-                        // But overwriting might reset 'isRead'. 
-                        // Check if we need to update server_id.
-                        // If we skip, we won't verify the hash/content.
-                        console.log(`[BackgroundChat] Sync message ${messageId} already exists, skipping.`);
-                        return;
-                    }
+                    console.log(`[BackgroundChat] Sync message ${messageId} already exists, skipping.`);
                     return;
                 }
             }
 
-            console.log(`[BackgroundChat] Processing sync message from ${syncMsg.sender_id}`);
+            console.log(`[BackgroundChat] Processing sync message from ${senderId}`);
 
             // Decrypt
             let contentBuffer: Uint8Array;
@@ -127,15 +127,15 @@ export class BackgroundChatService {
             }
 
             const decrypted = await SignalService.getInstance().decryptMessage(
-                syncMsg.sender_id,
+                senderId,
                 syncMsg.sender_device_id || 1,
                 contentBuffer,
                 syncMsg.message_type
             );
 
             // Conversation Mapping
-            const currentConvId = MessageStorage.getConversationId(syncMsg.sender_id);
-            let conversationId = syncMsg.conversation_id;
+            const currentConvId = MessageStorage.getConversationId(senderId);
+            let conversationId = conversationIdRaw;
 
             if (!conversationId && currentConvId) {
                 conversationId = currentConvId;
@@ -144,11 +144,11 @@ export class BackgroundChatService {
             if (!conversationId) {
                 // Fallback: create mapping if missing?
                 // Or we accept the conversation_id from server
-                conversationId = syncMsg.conversation_id || uuidv4(); // Should use server's conv id if available
+                conversationId = conversationIdRaw || uuidv4();
             }
 
             if (conversationId) {
-                MessageStorage.saveConversationMapping(syncMsg.sender_id, conversationId);
+                MessageStorage.saveConversationMapping(senderId, conversationId);
             }
 
             const newMsg: ChatMessage = {

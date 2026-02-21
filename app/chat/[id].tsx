@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
     Keyboard,
     Platform,
@@ -16,6 +16,7 @@ import {
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
+    useAnimatedScrollHandler,
     withTiming,
     Easing,
 } from "react-native-reanimated";
@@ -27,7 +28,12 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { getAvatarUrl } from "@/components/ui/avatar-picker-sheet";
 import { WHATSAPP_GREEN, DEFAULT_DEVICE_ID } from "@/constants/chat";
 import { useChat } from "@/hooks/use-chat";
+import { useFriends } from "@/hooks/use-friends";
 import { ChatMessage } from "@/types/chat";
+
+type ListItem =
+    | { type: "date"; id: string; dateText: string }
+    | { type: "message"; id: string; message: ChatMessage };
 
 // ─── Font Family ────────────────────────────────────────────
 const FONT = {
@@ -82,10 +88,62 @@ export default function ChatScreen() {
     const theme = isDark ? palette.dark : palette.light;
     const insets = useSafeAreaInsets();
 
-    const { messages, sendMessage, loading } = useChat(id, DEFAULT_DEVICE_ID);
+    const { messages, sendMessage, retryMessage, loading } = useChat(id, DEFAULT_DEVICE_ID);
+    const { data: friends } = useFriends();
+    const friend = friends?.find((f) => f.user_id === id);
+
     const [inputText, setInputText] = useState("");
-    const flatListRef = useRef<FlatList<ChatMessage>>(null);
+    const flatListRef = useRef<FlatList<ListItem>>(null);
     const inputRef = useRef<TextInput>(null);
+
+    const { flattenedData, stickyHeaderIndices } = useMemo(() => {
+        const flat: ListItem[] = [];
+        const stickyIndices: number[] = [];
+
+        const isSameDay = (d1: Date, d2: Date) =>
+            d1.getFullYear() === d2.getFullYear() &&
+            d1.getMonth() === d2.getMonth() &&
+            d1.getDate() === d2.getDate();
+
+        const formatDate = (timestamp?: number) => {
+            if (!timestamp) return "ไม่ทราบเวลา";
+            const date = new Date(timestamp);
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            if (isSameDay(date, today)) return "วันนี้";
+            if (isSameDay(date, yesterday)) return "เมื่อวาน";
+
+            const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+            return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear() + 543}`;
+        };
+
+        messages.forEach((msg, index) => {
+            const currentDate = new Date(msg.timestamp || 0);
+            const currentDateString = currentDate.toDateString();
+
+            const prevMsg = index > 0 ? messages[index - 1] : null;
+            const prevDateString = prevMsg ? new Date(prevMsg.timestamp || 0).toDateString() : null;
+
+            if (currentDateString !== prevDateString) {
+                stickyIndices.push(flat.length);
+                flat.push({
+                    type: "date",
+                    id: `date-${currentDateString}`,
+                    dateText: formatDate(msg.timestamp)
+                });
+            }
+
+            flat.push({
+                type: "message",
+                id: msg.id,
+                message: msg
+            });
+        });
+
+        return { flattenedData: flat, stickyHeaderIndices: stickyIndices };
+    }, [messages]);
 
     // ─── Keyboard-aware bottom spacing ──────────────────────
     const keyboardHeight = useSharedValue(0);
@@ -139,10 +197,47 @@ export default function ChatScreen() {
         setInputText("");
     }, [inputText, sendMessage]);
 
+    // ─── Scrolling State for Sticky Date ───────────────────
+    const isScrolling = useSharedValue(false);
+    let scrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null).current;
+
+    const onScroll = useCallback(() => {
+        if (!isScrolling.value) {
+            isScrolling.value = true;
+        }
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            isScrolling.value = false;
+        }, 1500); // ชะลอเวลาให้แสดงนานขึ้นนิดนึง
+    }, [isScrolling]);
+
+    const dateSeparatorStyle = useAnimatedStyle(() => {
+        return {
+            opacity: withTiming(isScrolling.value ? 1 : 0, { duration: 300 }),
+            transform: [
+                { translateY: withTiming(isScrolling.value ? 0 : -10, { duration: 300 }) }
+            ]
+        };
+    });
+
     // ─── Render message ─────────────────────────────────────
     const renderMessage = useCallback(
-        ({ item }: ListRenderItemInfo<ChatMessage>) => {
-            const isMe = item.sender === "me";
+        ({ item }: ListRenderItemInfo<ListItem>) => {
+            if (item.type === "date") {
+                return (
+                    <Animated.View style={[styles.dateSeparatorContainer, dateSeparatorStyle]}>
+                        <View style={[styles.dateSeparator, { backgroundColor: !isDark ? "rgba(0, 0, 0, 0.2)" : "rgba(255, 255, 255, 0.2)" }]}>
+                            <Text style={[styles.dateSeparatorText, { color: !isDark ? "#fff" : "#000" }]}>
+                                {item.dateText}
+                            </Text>
+                        </View>
+                    </Animated.View>
+                );
+            }
+
+            const msg = item.message;
+            const isMe = msg.sender === "me";
+
             return (
                 <View
                     style={[
@@ -150,75 +245,86 @@ export default function ChatScreen() {
                         isMe ? styles.bubbleRowMe : styles.bubbleRowThem,
                     ]}
                 >
-                    <View
-                        style={[
-                            styles.bubble,
-                            isMe
-                                ? {
-                                    backgroundColor: theme.bubbleMe,
-                                    borderBottomRightRadius: 4,
-                                }
-                                : {
-                                    backgroundColor: theme.bubbleThem,
-                                    borderBottomLeftRadius: 4,
-                                },
-                        ]}
-                    >
-                        <Text
-                            style={[
-                                styles.bubbleText,
-                                {
-                                    color: isMe
-                                        ? theme.bubbleMeText
-                                        : theme.bubbleThemText,
-                                },
-                            ]}
-                        >
-                            {item.text}
-                        </Text>
-                        <View style={styles.bubbleFooter}>
-                            <Text
+                    <View style={isMe ? styles.messageContainerMe : styles.messageContainerThem}>
+                        {/* They details (Avatar, name could go here) */}
+
+                        <View style={{ flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end', flex: 1 }}>
+
+                            {/* Message Bubble */}
+                            <View
                                 style={[
-                                    styles.timeText,
-                                    {
-                                        color: isMe
-                                            ? theme.timeMe
-                                            : theme.timeThem,
-                                    },
+                                    styles.bubble,
+                                    isMe
+                                        ? {
+                                            backgroundColor: theme.bubbleMe,
+                                            borderBottomRightRadius: 4,
+                                        }
+                                        : {
+                                            backgroundColor: theme.bubbleThem,
+                                            borderBottomLeftRadius: 4,
+                                        },
                                 ]}
                             >
-                                {item.time}
-                            </Text>
-                            {isMe && (
-                                <Ionicons
-                                    name={
-                                        item.status === "pending" ||
-                                            item.status === "sending"
-                                            ? "time-outline"
-                                            : item.status === "failed"
-                                                ? "alert-circle-outline"
-                                                : item.status === "read"
-                                                    ? "checkmark-done-outline"
-                                                    : "checkmark-outline"
-                                    }
-                                    size={12}
-                                    color={
-                                        item.status === "read"
-                                            ? "#4FC3F7"
-                                            : theme.timeMe
-                                    }
-                                    style={{ marginLeft: 3 }}
-                                />
-                            )}
+                                <Text
+                                    style={[
+                                        styles.bubbleText,
+                                        {
+                                            color: isMe
+                                                ? theme.bubbleMeText
+                                                : theme.bubbleThemText,
+                                        },
+                                    ]}
+                                >
+                                    {msg.text}
+                                </Text>
+                            </View>
+
+                            {/* Meta info (Time & Status) outside bubble */}
+                            <View style={[styles.metaContainer, isMe ? { marginRight: 6 } : { marginLeft: 6 }]}>
+                                {isMe && msg.status === "failed" ? (
+                                    <TouchableOpacity onPress={() => retryMessage(msg.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ alignItems: 'flex-end' }}>
+                                        <Ionicons
+                                            name="refresh-circle"
+                                            size={20}
+                                            color="#FF3B30"
+                                        />
+                                        <Text style={{ color: '#FF3B30', fontSize: 10, fontFamily: FONT.regular, marginTop: 2 }}>Failed</Text>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <View style={{ flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'center' }}>
+                                        <Text style={{ color: theme.textSecondary, fontSize: 9, fontFamily: FONT.regular }}>{msg.time}</Text>
+
+                                        {isMe && msg.status && (
+                                            <Ionicons
+                                                name={
+                                                    msg.status === "pending" ||
+                                                        msg.status === "sending"
+                                                        ? "time-outline"
+                                                        : msg.status === "read"
+                                                            ? "checkmark-done-outline"
+                                                            : "checkmark-outline"
+                                                }
+                                                size={14}
+                                                color={
+                                                    msg.status === "read"
+                                                        ? "#4FC3F7"
+                                                        : theme.textSecondary
+                                                }
+                                                style={{ marginRight: 4 }}
+                                            />
+                                        )}
+                                    </View>
+                                )}
+                            </View>
                         </View>
                     </View>
                 </View>
             );
         },
-        [theme]
+        [theme, retryMessage, dateSeparatorStyle]
     );
 
-    const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
+    const keyExtractor = useCallback((item: ListItem) => item.id, []);
 
     return (
         <ThemedView style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -249,7 +355,9 @@ export default function ChatScreen() {
                         >
                             <Image
                                 source={{
-                                    uri: getAvatarUrl(id || "unknown"),
+                                    uri:
+                                        friend?.profile_picture ||
+                                        getAvatarUrl(friend?.username || id || "unknown"),
                                 }}
                                 style={styles.headerAvatar}
                             />
@@ -261,16 +369,16 @@ export default function ChatScreen() {
                                     ]}
                                     numberOfLines={1}
                                 >
-                                    Friend {id?.slice(0, 4)}
+                                    {friend?.display_name || friend?.username || `User ${id?.slice(0, 4)}`}
                                 </Text>
-                                <Text
+                                {/* <Text
                                     style={[
                                         styles.headerStatus,
                                         { color: theme.textSecondary },
                                     ]}
                                 >
-                                    ออนไลน์
-                                </Text>
+                                    Online
+                                </Text> */}
                             </View>
                         </TouchableOpacity>
                     ),
@@ -305,20 +413,24 @@ export default function ChatScreen() {
                         />
                     </View>
                 ) : (
-                    <FlatList<ChatMessage>
+                    <Animated.FlatList<ListItem>
                         ref={flatListRef}
-                        data={messages}
+                        data={flattenedData}
                         keyExtractor={keyExtractor}
+                        stickyHeaderIndices={stickyHeaderIndices}
                         renderItem={renderMessage}
                         contentContainerStyle={styles.listContent}
                         keyboardDismissMode="interactive"
                         keyboardShouldPersistTaps="handled"
                         showsVerticalScrollIndicator={false}
+                        onScroll={onScroll}
+                        scrollEventThrottle={16}
                         onContentSizeChange={() => {
                             flatListRef.current?.scrollToEnd({
                                 animated: false,
                             });
                         }}
+                        overScrollMode="never"
                     />
                 )}
 
@@ -461,7 +573,7 @@ const styles = StyleSheet.create({
 
     // Bubble
     bubbleRow: {
-        marginBottom: 6,
+        marginBottom: 8,
     },
     bubbleRowMe: {
         alignItems: "flex-end",
@@ -469,27 +581,42 @@ const styles = StyleSheet.create({
     bubbleRowThem: {
         alignItems: "flex-start",
     },
+    messageContainerMe: {
+        flexDirection: 'row-reverse',
+        maxWidth: "85%",
+    },
+    messageContainerThem: {
+        flexDirection: 'row',
+        maxWidth: "85%",
+    },
     bubble: {
-        maxWidth: "78%",
         paddingHorizontal: 14,
-        paddingTop: 10,
-        paddingBottom: 8,
+        paddingVertical: 10,
         borderRadius: 20,
     },
     bubbleText: {
         fontFamily: FONT.regular,
-        fontSize: 15.5,
-        lineHeight: 21,
+        fontSize: 15,
+        lineHeight: 22,
     },
-    bubbleFooter: {
-        flexDirection: "row",
+    metaContainer: {
+        justifyContent: 'flex-end',
+        paddingBottom: 2,
+    },
+
+    // Date Separator
+    dateSeparatorContainer: {
         alignItems: "center",
-        justifyContent: "flex-end",
-        marginTop: 4,
+        marginVertical: 12,
+        zIndex: 10,
     },
-    timeText: {
-        fontFamily: FONT.thin,
-        fontSize: 11,
+    dateSeparator: {
+        paddingHorizontal: 10,
+        borderRadius: 16,
+    },
+    dateSeparatorText: {
+        fontFamily: FONT.regular,
+        fontSize: 10,
     },
 
     // Input Bar

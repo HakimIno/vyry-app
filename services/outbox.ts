@@ -22,7 +22,7 @@ const outboxStorage = createMMKV({
 });
 
 const QUEUE_KEY = "outbox_queue";
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
 
 export class OutboxService {
@@ -111,10 +111,12 @@ export class OutboxService {
             }
 
             // Wait for WebSocket to be ready
-            const isConnected = await wsService.waitForConnection(5000);
+            const isConnected = await wsService.waitForConnection(3000);
+
+            // If offline, drain queue actively by incrementing retry counts and failing them
             if (!isConnected) {
-                console.log("[Outbox] Offline, will retry in 3s...");
-                this.scheduleProcess(3000);
+                console.log("[Outbox] Offline, forcefully failing pending messages to show Retry button...");
+                this.handleOfflineQueue();
                 return;
             }
 
@@ -123,6 +125,36 @@ export class OutboxService {
 
         } finally {
             this.isProcessing = false;
+        }
+    }
+
+    private handleOfflineQueue() {
+        let queue = this.getQueue();
+        let queueChanged = false;
+
+        for (let i = 0; i < queue.length; i++) {
+            const item = queue[i];
+            item.retryCount++;
+
+            if (item.retryCount >= MAX_RETRIES) {
+                console.warn(`[Outbox] Message ${item.clientMessageId} exceeded ${MAX_RETRIES} retries while offline, failing`);
+                MessageStorage.updateMessageStatus(item.conversationId, item.clientMessageId, "failed");
+                // Remove from queue
+                queue.splice(i, 1);
+                i--; // Adjust index after removal
+                queueChanged = true;
+            } else {
+                console.log(`[Outbox] Offline retry attempt ${item.retryCount}/${MAX_RETRIES} for ${item.clientMessageId}`);
+                queueChanged = true;
+            }
+        }
+
+        if (queueChanged) {
+            this.saveQueue(queue);
+            // Schedule another check if there are still items
+            if (queue.length > 0) {
+                this.scheduleProcess(RETRY_DELAY_MS);
+            }
         }
     }
 
@@ -171,6 +203,10 @@ export class OutboxService {
                     this.scheduleProcess(RETRY_DELAY_MS);
                 } else {
                     MessageStorage.updateMessageStatus(item.conversationId, item.clientMessageId, "failed");
+                    // Remove failed item to unblock the queue for other messages
+                    queue.shift();
+                    this.saveQueue(queue);
+                    this.scheduleProcess(100);
                 }
 
                 // Stop processing to maintain message order
@@ -223,5 +259,51 @@ export class OutboxService {
         if (!wsService.send(payload)) {
             throw new Error("WebSocket not connected");
         }
+    }
+
+    public async retry(
+        conversationId: string,
+        clientMessageId: string,
+        recipientId: string,
+        recipientDeviceId: number,
+        text: string
+    ) {
+        console.log(`[Outbox] Retry request for ${clientMessageId}`);
+
+        // 1. Check if already in queue
+        const queue = this.getQueue();
+        const existingIndex = queue.findIndex(i => i.clientMessageId === clientMessageId);
+
+        if (existingIndex !== -1) {
+            console.log(`[Outbox] Message ${clientMessageId} already in queue, resetting retries`);
+            const item = queue[existingIndex];
+            item.retryCount = 0;
+            // Update details in case they changed (e.g. new active device ID)
+            item.recipientId = recipientId;
+            item.recipientDeviceId = recipientDeviceId;
+            item.text = text;
+            item.timestamp = Date.now();
+
+            // Move to end of queue
+            queue.splice(existingIndex, 1);
+            queue.push(item);
+
+            this.saveQueue(queue);
+            MessageStorage.updateMessageStatus(conversationId, clientMessageId, "pending");
+            this.processQueue();
+            return;
+        }
+
+        // 2. Not in queue, re-enqueue
+        console.log(`[Outbox] Re-enqueuing message ${clientMessageId} for retry`);
+        MessageStorage.updateMessageStatus(conversationId, clientMessageId, "pending");
+
+        await this.enqueue(
+            conversationId,
+            clientMessageId,
+            recipientId,
+            recipientDeviceId,
+            text
+        );
     }
 }
